@@ -11,11 +11,11 @@ val keystoreProps = Properties().apply {
 }
 
 android {
-    namespace = "com.luqman.bigclock"
+    namespace = "com.luqman.decko"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.luqman.bigclock"
+        applicationId = "com.luqman.decko"
         minSdk = 26
         targetSdk = 36
         versionCode = 1

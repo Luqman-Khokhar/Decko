@@ -1,7 +1,7 @@
 <resources>
-    <string name="app_name">Big Clock</string>
-    <string name="video_wallpaper_label">Big Clock video</string>
-    <string name="widget_label">Big Clock</string>
+    <string name="app_name">Decko</string>
+    <string name="video_wallpaper_label">Decko video</string>
+    <string name="widget_label">Decko</string>
     <string name="widget_description">Large, easy-to-read analog clock</string>
     <string name="choose_design">Choose clock design</string>
     <string name="choose_design_hint">Tap a clock to preview it full screen.</string>
@@ -45,7 +45,7 @@
     <string name="stickers_title">Stickers</string>
     <string name="stickers_hint">WebP, GIF and sticker-folder images found on this device, such as downloaded WhatsApp or Telegram stickers.</string>
     <string name="stickers_empty">No stickers found. Download or save some stickers first, then come back.</string>
-    <string name="stickers_permission">Allow access to photos so Big Clock can find your stickers.</string>
+    <string name="stickers_permission">Allow access to photos so Decko can find your stickers.</string>
     <string name="stickers_allow">Allow access</string>
     <string name="sticker_item">Sticker</string>
     <string name="widget_added">Widget added to your home screen</string>
@@ -77,8 +77,6 @@
     <string name="header_show">Show when</string>
     <string name="trigger_always">Always</string>
     <string name="trigger_charging">While charging</string>
-    <string name="trigger_notification">A notification arrives</string>
-    <string name="header_notification_access">Allow notification access</string>
     <string name="header_hide_fullscreen">Hide in fullscreen apps</string>
     <string name="header_channel">Header animation</string>
     <string name="header_notification_title">Header animation is on</string>
@@ -90,7 +88,7 @@
     <string name="my_wallpapers">Your wallpapers</string>
     <string name="my_wallpapers_entry">Use your own photos, GIFs or video loops</string>
     <string name="wallpapers_empty">No wallpapers yet. Tap + to add a photo.</string>
-    <string name="my_wallpapers_hint">Add photos, GIFs, animated WebP or short video loops. You can also share them from any app to Big Clock.</string>
+    <string name="my_wallpapers_hint">Add photos, GIFs, animated WebP or short video loops. You can also share them from any app to Decko.</string>
     <string name="add_wallpaper">Add wallpaper</string>
     <string name="wallpaper_item">Wallpaper</string>
     <string name="video_item">Video wallpaper</string>
@@ -99,14 +97,14 @@
     <string name="animated_too_large">That animation is too large (max 50 MB).</string>
     <string name="animated_info">%1$d × %2$d · %3$s</string>
     <string name="animated_heavy_warning">Large animations use more battery. A loop under 10 MB works best.</string>
-    <string name="animated_wallpaper_label">Big Clock animation</string>
-    <string name="animated_wallpaper_description">Plays an animated GIF or WebP from your Big Clock library. Pauses when the screen is off or battery saver is on.</string>
+    <string name="animated_wallpaper_label">Decko animation</string>
+    <string name="animated_wallpaper_description">Plays an animated GIF or WebP from your Decko library. Pauses when the screen is off or battery saver is on.</string>
     <string name="video_too_large">That video is too large (max 300 MB). Try a shorter clip or a lower recording quality.</string>
     <string name="video_too_long">That video is too long (max 60 seconds).</string>
     <string name="set_live">Set as live wallpaper</string>
     <string name="video_info">%1$d × %2$d · %3$d s · %4$s</string>
     <string name="video_heavy_warning">Large or long videos use more battery. A 1080p loop under 20 seconds works best.</string>
-    <string name="video_wallpaper_description">Plays a video loop from your Big Clock library. Pauses when the screen is off or battery saver is on.</string>
+    <string name="video_wallpaper_description">Plays a video loop from your Decko library. Pauses when the screen is off or battery saver is on.</string>
     <string name="import_failed">Could not add that file.</string>
     <string name="set_static">Set as wallpaper</string>
     <string name="set_where_title">Set wallpaper on</string>
@@ -125,7 +123,7 @@
     <string name="use_for_wallpaper">Use this design for wallpaper</string>
     <string name="remove_wallpaper">Remove wallpaper</string>
     <string name="remove_wallpaper_failed">Could not remove the wallpaper. Change it in Settings → Wallpaper.</string>
-    <string name="lock_screen_manual">Open Settings → Wallpaper, choose Live wallpaper → Big Clock, and apply it to the lock screen.</string>
-    <string name="wallpaper_description">Big analog clock on your lock screen and home screen. Uses the design chosen in the Big Clock app.</string>
-    <string name="add_widget_manual">Long-press the home screen, tap Widgets, then drag Big Clock onto it.</string>
+    <string name="lock_screen_manual">Open Settings → Wallpaper, choose Live wallpaper → Decko, and apply it to the lock screen.</string>
+    <string name="wallpaper_description">Big analog clock on your lock screen and home screen. Uses the design chosen in the Decko app.</string>
+    <string name="add_widget_manual">Long-press the home screen, tap Widgets, then drag Decko onto it.</string>
 </resources>

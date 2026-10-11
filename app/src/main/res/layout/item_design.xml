@@ -10,7 +10,7 @@
     android:orientation="horizontal"
     android:padding="12dp">
 
-    <com.luqman.bigclock.AnalogClockView
+    <com.luqman.decko.AnalogClockView
         android:id="@+id/preview"
         android:layout_width="104dp"
         android:layout_height="104dp"
