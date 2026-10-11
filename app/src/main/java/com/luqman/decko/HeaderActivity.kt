@@ -32,7 +32,6 @@ class HeaderActivity : Activity() {
     private lateinit var enable: Switch
     private lateinit var permissionButton: Button
     private lateinit var permissionHint: TextView
-    private lateinit var notificationAccess: Button
     private var characterGrid: GridLayout? = null
     private var listener: SharedPreferences.OnSharedPreferenceChangeListener? = null
     private var awaitingPermission = false
@@ -84,12 +83,7 @@ class HeaderActivity : Activity() {
         enable.setOnCheckedChangeListener(null)
         enable.isChecked = Prefs.header(this).enabled && canDraw
         enable.setOnCheckedChangeListener { _, checked -> onEnableToggled(checked) }
-        notificationAccess.visibility =
-            if (Prefs.header(this).trigger == HeaderConfig.TRIGGER_NOTIFICATION && !hasNotificationAccess()) View.VISIBLE else View.GONE
     }
-
-    private fun hasNotificationAccess(): Boolean =
-        Settings.Secure.getString(contentResolver, "enabled_notification_listeners").orEmpty().contains(packageName)
 
     private fun onEnableToggled(checked: Boolean) {
         if (checked && !HeaderOverlayService.canDraw(this)) {
@@ -152,14 +146,9 @@ class HeaderActivity : Activity() {
         options.addView(swatches(c.color), lp())
         slider(R.string.header_effect_speed, 1, 10, c.effectSpeed, "header_effect_speed") { getString(R.string.header_effect_speed, it) }
 
-        choices(R.string.header_show, listOf(R.string.trigger_always, R.string.trigger_charging, R.string.trigger_notification), c.trigger, "header_trigger") {
+        choices(R.string.header_show, listOf(R.string.trigger_always, R.string.trigger_charging), c.trigger, "header_trigger") {
             refreshState()
         }
-        notificationAccess = Button(this).apply {
-            setText(R.string.header_notification_access)
-            setOnClickListener { startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)) }
-        }
-        options.addView(notificationAccess, lp(top = 4))
 
         val hide = Switch(this).apply {
             text = getString(R.string.header_hide_fullscreen)

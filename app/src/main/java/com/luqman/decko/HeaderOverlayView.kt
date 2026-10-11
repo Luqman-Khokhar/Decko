@@ -1,5 +1,6 @@
 package com.luqman.decko
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Canvas
 import android.graphics.ImageDecoder
@@ -106,6 +107,7 @@ class HeaderOverlayView(ctx: Context) : View(ctx) {
         }
     }
 
+    @SuppressLint("WrongThread") // Only called from Library.io, never the UI thread.
     private fun decodeCharacter(id: String): Drawable? {
         val item = Library.find(context, id) ?: return null
         val target = (MAX_DECODE_DP * density).toInt()

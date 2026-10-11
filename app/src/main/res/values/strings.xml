@@ -77,8 +77,6 @@
     <string name="header_show">Show when</string>
     <string name="trigger_always">Always</string>
     <string name="trigger_charging">While charging</string>
-    <string name="trigger_notification">A notification arrives</string>
-    <string name="header_notification_access">Allow notification access</string>
     <string name="header_hide_fullscreen">Hide in fullscreen apps</string>
     <string name="header_channel">Header animation</string>
     <string name="header_notification_title">Header animation is on</string>

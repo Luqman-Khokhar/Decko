@@ -30,7 +30,6 @@ class HeaderConfig(
 
         const val TRIGGER_ALWAYS = 0
         const val TRIGGER_CHARGING = 1
-        const val TRIGGER_NOTIFICATION = 2
 
         const val MIN_SIZE_DP = 12
         const val MAX_SIZE_DP = 40

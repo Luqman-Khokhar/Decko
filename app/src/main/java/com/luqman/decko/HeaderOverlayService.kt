@@ -18,7 +18,6 @@ import android.os.Build
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
-import android.os.SystemClock
 import android.provider.Settings
 import android.view.Gravity
 import android.view.WindowInsets
@@ -26,7 +25,7 @@ import android.view.WindowManager
 
 /**
  * Keeps the header animation on screen: a click-through overlay window over the status-bar strip.
- * It pauses itself when the screen is off, the trigger (charging / notification) is not met, or a fullscreen app hides the bar.
+ * It pauses itself when the screen is off, the charging trigger is not met, or a fullscreen app hides the bar.
  */
 class HeaderOverlayService : Service() {
     private lateinit var wm: WindowManager
@@ -37,7 +36,6 @@ class HeaderOverlayService : Service() {
 
     private var screenOn = true
     private var charging = false
-    private var flashUntil = 0L
     private var barVisible = true
 
     private val receiver = object : BroadcastReceiver() {
@@ -47,10 +45,6 @@ class HeaderOverlayService : Service() {
                 Intent.ACTION_SCREEN_ON -> screenOn = true
                 Intent.ACTION_POWER_CONNECTED -> charging = true
                 Intent.ACTION_POWER_DISCONNECTED -> charging = false
-                ACTION_FLASH -> {
-                    flashUntil = SystemClock.uptimeMillis() + FLASH_MS
-                    handler.postDelayed({ updateVisibility() }, FLASH_MS + 100)
-                }
             }
             updateVisibility()
         }
@@ -69,9 +63,8 @@ class HeaderOverlayService : Service() {
             addAction(Intent.ACTION_SCREEN_ON)
             addAction(Intent.ACTION_POWER_CONNECTED)
             addAction(Intent.ACTION_POWER_DISCONNECTED)
-            addAction(ACTION_FLASH)
         }
-        if (Build.VERSION.SDK_INT >= 33) registerReceiver(receiver, filter, Context.RECEIVER_EXPORTED) else registerReceiver(receiver, filter)
+        if (Build.VERSION.SDK_INT >= 33) registerReceiver(receiver, filter, Context.RECEIVER_NOT_EXPORTED) else registerReceiver(receiver, filter)
         listener = Prefs.onHeaderChanged(this) { handler.post { onConfigChanged() } }
     }
 
@@ -192,7 +185,6 @@ class HeaderOverlayService : Service() {
         val config = Prefs.header(this)
         val triggered = when (config.trigger) {
             HeaderConfig.TRIGGER_CHARGING -> charging
-            HeaderConfig.TRIGGER_NOTIFICATION -> SystemClock.uptimeMillis() < flashUntil
             else -> true
         }
         val show = screenOn && triggered && (barVisible || !config.hideFullscreen)
@@ -201,10 +193,8 @@ class HeaderOverlayService : Service() {
     }
 
     companion object {
-        const val ACTION_FLASH = "com.luqman.decko.HEADER_FLASH"
         private const val CHANNEL = "header"
         private const val NOTIFICATION_ID = 7
-        private const val FLASH_MS = 6000L
 
         fun canDraw(ctx: Context) = Settings.canDrawOverlays(ctx)
 
