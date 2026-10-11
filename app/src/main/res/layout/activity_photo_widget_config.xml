@@ -1,0 +1,133 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:fitsSystemWindows="true"
+    android:orientation="vertical">
+
+    <include
+        android:id="@+id/tab_bar"
+        layout="@layout/tab_bar" />
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:clipToPadding="false">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:accessibilityHeading="true"
+                android:fontFamily="sans-serif-medium"
+                android:text="@string/photo_widget_title"
+                android:textColor="@color/config_text"
+                android:textSize="28sp" />
+
+            <ImageView
+                android:id="@+id/preview"
+                android:layout_width="240dp"
+                android:layout_height="240dp"
+                android:layout_gravity="center_horizontal"
+                android:layout_marginTop="12dp"
+                android:background="@drawable/preview_frame"
+                android:contentDescription="@string/photo_widget_preview"
+                android:scaleType="fitCenter" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="@string/photo_widget_static_note"
+                android:textColor="@color/config_text_muted"
+                android:textSize="14sp" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:fontFamily="sans-serif-medium"
+                android:text="@string/photo_widget_pick"
+                android:textColor="@color/config_text"
+                android:textSize="18sp" />
+
+            <GridLayout
+                android:id="@+id/pick_grid"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:columnCount="4" />
+
+            <Button
+                android:id="@+id/find_stickers"
+                style="?android:attr/buttonBarButtonStyle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/photo_widget_find_stickers" />
+
+            <TextView
+                android:id="@+id/empty"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="@string/photo_widget_empty"
+                android:textColor="@color/config_text_muted"
+                android:textSize="16sp"
+                android:visibility="gone" />
+
+            <RadioGroup
+                android:id="@+id/fit_group"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:orientation="horizontal">
+
+                <RadioButton
+                    android:id="@+id/fit_fill"
+                    android:layout_width="0dp"
+                    android:layout_height="48dp"
+                    android:layout_weight="1"
+                    android:checked="true"
+                    android:text="@string/photo_widget_fill"
+                    android:textColor="@color/config_text" />
+
+                <RadioButton
+                    android:id="@+id/fit_whole"
+                    android:layout_width="0dp"
+                    android:layout_height="48dp"
+                    android:layout_weight="1"
+                    android:text="@string/photo_widget_fit"
+                    android:textColor="@color/config_text" />
+            </RadioGroup>
+
+            <TextView
+                android:id="@+id/corners_label"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:labelFor="@+id/corners"
+                android:text="@string/photo_widget_corners"
+                android:textColor="@color/config_text"
+                android:textSize="16sp" />
+
+            <SeekBar
+                android:id="@+id/corners"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:max="48" />
+        </LinearLayout>
+    </ScrollView>
+
+    <Button
+        android:id="@+id/done"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_margin="16dp"
+        android:enabled="false"
+        android:text="@string/photo_widget_done" />
+</LinearLayout>

@@ -1,0 +1,11 @@
+<resources>
+    <color name="controls_bg">#F2121214</color>
+    <color name="controls_text">#FFF4F4F2</color>
+    <color name="controls_surface">#FF232326</color>
+    <color name="controls_ripple">#33FFFFFF</color>
+    <color name="config_bg">#FFF6F5F2</color>
+    <color name="config_text">#FF1F1F1F</color>
+    <color name="config_text_muted">#FF5C5B57</color>
+    <color name="tile_bg">#FFE8E6E1</color>
+    <color name="icon_bg">#FF23303B</color>
+</resources>

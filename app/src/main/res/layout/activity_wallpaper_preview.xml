@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:contentDescription="@string/show_settings">
+
+    <SurfaceView
+        android:id="@+id/video"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:importantForAccessibility="no"
+        android:visibility="gone" />
+
+    <ImageView
+        android:id="@+id/image"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:importantForAccessibility="no"
+        android:scaleType="centerCrop" />
+
+    <LinearLayout
+        android:id="@+id/controls"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom"
+        android:background="@color/controls_bg"
+        android:clickable="true"
+        android:focusable="false"
+        android:orientation="vertical"
+        android:padding="16dp">
+
+        <TextView
+            android:id="@+id/video_info"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="8dp"
+            android:gravity="center"
+            android:textColor="@color/controls_text"
+            android:textSize="16sp"
+            android:visibility="gone" />
+
+        <TextView
+            android:id="@+id/preview_full"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:background="@drawable/btn_control"
+            android:fontFamily="sans-serif-medium"
+            android:gravity="center"
+            android:text="@string/preview_full"
+            android:textColor="@color/controls_text"
+            android:textSize="18sp" />
+
+        <TextView
+            android:id="@+id/set_static"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:layout_marginTop="8dp"
+            android:background="@drawable/btn_control"
+            android:fontFamily="sans-serif-medium"
+            android:gravity="center"
+            android:text="@string/set_static"
+            android:textColor="@color/controls_text"
+            android:textSize="18sp" />
+
+        <TextView
+            android:id="@+id/remove_static"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:layout_marginTop="8dp"
+            android:background="@drawable/btn_control"
+            android:fontFamily="sans-serif-medium"
+            android:gravity="center"
+            android:text="@string/remove_wallpaper"
+            android:textColor="@color/controls_text"
+            android:textSize="18sp"
+            android:visibility="gone" />
+
+        <TextView
+            android:id="@+id/delete_item"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:layout_marginTop="8dp"
+            android:background="@drawable/btn_control"
+            android:fontFamily="sans-serif-medium"
+            android:gravity="center"
+            android:text="@string/delete_from_library"
+            android:textColor="@color/controls_text"
+            android:textSize="18sp" />
+    </LinearLayout>
+</FrameLayout>
