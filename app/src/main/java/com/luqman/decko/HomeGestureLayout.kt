@@ -27,6 +27,12 @@ class HomeGestureLayout @JvmOverloads constructor(
     var drawerCanScrollUp: () -> Boolean = { false }
     var onDrawerStateChanged: (open: Boolean) -> Unit = {}
 
+    /** Every progress change, for styles that react to the drawer's position (blur, re-aimed glass). */
+    var onProgress: (Float) -> Unit = {}
+
+    /** Settle on a spring that keeps the fling's velocity, instead of a fixed-length curve. */
+    var springs = false
+
     /** 0 = home page, 1 = drawer fully open. */
     var progress = 0f
         private set
@@ -42,6 +48,7 @@ class HomeGestureLayout @JvmOverloads constructor(
     private var dragging = false
     private var tracker: VelocityTracker? = null
     private var animator: ValueAnimator? = null
+    private val spring = Spring(SPRING_STIFFNESS, SPRING_DAMPING, onUpdate = { apply(it) })
     private var settledOpen = false
 
     override fun onFinishInflate() {
@@ -78,8 +85,9 @@ class HomeGestureLayout @JvmOverloads constructor(
                 tracker?.recycle()
                 tracker = VelocityTracker.obtain().apply { addMovement(ev) }
                 // Catching the drawer mid-animation turns straight into a drag from where it is.
-                dragging = animator?.isRunning == true
+                dragging = animator?.isRunning == true || spring.isRunning
                 animator?.cancel()
+                spring.cancel()
                 startProgress = progress
             }
             MotionEvent.ACTION_MOVE -> {
@@ -103,7 +111,8 @@ class HomeGestureLayout @JvmOverloads constructor(
                         v > flingVelocity -> false
                         else -> progress > 0.5f
                     }
-                    settle(if (open) 1f else 0f, true)
+                    // Upward finger speed is drawer progress per second.
+                    settle(if (open) 1f else 0f, true, -v / height.coerceAtLeast(1))
                 }
                 dragging = false
                 tracker?.recycle()
@@ -115,8 +124,13 @@ class HomeGestureLayout @JvmOverloads constructor(
     private fun canStartDrag(dy: Float) =
         (progress == 0f && dy < 0) || (progress == 1f && dy > 0 && !drawerCanScrollUp())
 
-    private fun settle(target: Float, animate: Boolean) {
+    private fun settle(target: Float, animate: Boolean, velocity: Float = 0f) {
         animator?.cancel()
+        spring.cancel()
+        if (springs && animate && progress != target) {
+            spring.animateTo(target, progress, velocity)
+            return
+        }
         if (!animate || !ValueAnimator.areAnimatorsEnabled() || progress == target) {
             apply(target)
             return
@@ -144,6 +158,7 @@ class HomeGestureLayout @JvmOverloads constructor(
         home.scaleY = home.scaleX
         home.translationY = -HOME_LIFT * h * progress
         home.visibility = if (progress == 1f) INVISIBLE else VISIBLE
+        onProgress(progress)
         if (progress == 1f && !settledOpen) {
             settledOpen = true
             onDrawerStateChanged(true)
@@ -159,6 +174,8 @@ class HomeGestureLayout @JvmOverloads constructor(
         const val MIN_DURATION_MS = 140L
         const val HOME_SHRINK = 0.06f
         const val HOME_LIFT = 0.04f
+        const val SPRING_STIFFNESS = 260f
+        const val SPRING_DAMPING = 0.92f
 
         /** Material 3 "emphasized decelerate". */
         val EMPHASIZED_DECELERATE = PathInterpolator(0.05f, 0.7f, 0.1f, 1f)

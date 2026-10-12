@@ -27,6 +27,9 @@ class HomePager @JvmOverloads constructor(
     var currentPage = 0
         private set
 
+    /** Styles move pages in depth as they scroll; called with each page and its offset from center. */
+    var pageTransform: ((View, Float) -> Unit)? = null
+
     private val scroller = OverScroller(context, DecelerateInterpolator(1.6f))
     private val config = ViewConfiguration.get(context)
     private val slop = config.scaledTouchSlop
@@ -59,7 +62,11 @@ class HomePager @JvmOverloads constructor(
 
     override fun onScrollChanged(l: Int, t: Int, oldl: Int, oldt: Int) {
         super.onScrollChanged(l, t, oldl, oldt)
-        if (width > 0) onScroll(l / width.toFloat())
+        if (width > 0) {
+            val position = l / width.toFloat()
+            onScroll(position)
+            pageTransform?.let { t -> for (i in 0 until childCount) t(getChildAt(i), i - position) }
+        }
     }
 
     override fun computeScroll() {

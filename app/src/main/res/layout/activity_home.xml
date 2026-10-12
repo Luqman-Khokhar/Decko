@@ -65,6 +65,82 @@
                 android:layout_marginTop="24dp"
                 android:accessibilityHeading="true"
                 android:fontFamily="sans-serif-medium"
+                android:text="@string/home_style"
+                android:textColor="@color/config_text"
+                android:textSize="20sp" />
+
+            <LinearLayout
+                android:id="@+id/styles"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:baselineAligned="false"
+                android:orientation="horizontal" />
+
+            <LinearLayout
+                android:id="@+id/glass_options"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/glass_mode_label"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    android:fontFamily="sans-serif-medium"
+                    android:text="@string/glass_mode"
+                    android:textColor="@color/config_text"
+                    android:textSize="16sp" />
+
+                <RadioGroup
+                    android:id="@+id/glass_mode"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:accessibilityPaneTitle="@string/glass_mode"
+                    android:orientation="horizontal">
+
+                    <RadioButton
+                        android:id="@+id/mode_auto"
+                        android:layout_width="0dp"
+                        android:layout_height="48dp"
+                        android:layout_weight="1"
+                        android:text="@string/glass_auto"
+                        android:textColor="@color/config_text" />
+
+                    <RadioButton
+                        android:id="@+id/mode_light"
+                        android:layout_width="0dp"
+                        android:layout_height="48dp"
+                        android:layout_weight="1"
+                        android:text="@string/glass_light"
+                        android:textColor="@color/config_text" />
+
+                    <RadioButton
+                        android:id="@+id/mode_dark"
+                        android:layout_width="0dp"
+                        android:layout_height="48dp"
+                        android:layout_weight="1"
+                        android:text="@string/glass_dark"
+                        android:textColor="@color/config_text" />
+                </RadioGroup>
+
+                <TextView
+                    android:id="@+id/glass_backdrop_hint"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:text="@string/glass_backdrop_hint"
+                    android:textColor="@color/config_text_muted"
+                    android:textSize="14sp" />
+            </LinearLayout>
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="24dp"
+                android:accessibilityHeading="true"
+                android:fontFamily="sans-serif-medium"
                 android:text="@string/icon_pack"
                 android:textColor="@color/config_text"
                 android:textSize="20sp" />

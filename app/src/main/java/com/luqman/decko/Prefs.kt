@@ -121,6 +121,33 @@ object Prefs {
         p.edit().apply { p.all.keys.filter { it.startsWith("icon_o_") }.forEach { remove(it) } }.apply()
     }
 
+    /** System wallpaper id right after Decko set a library image on the home screen; see [GlassBackdrop]. */
+    fun homeWallpaperId(ctx: Context) = sp(ctx).getInt("home_wallpaper_id", -1)
+
+    fun setHomeWallpaperId(ctx: Context, id: Int) {
+        sp(ctx).edit().putInt("home_wallpaper_id", id).apply()
+    }
+
+    /** Decko Home look: "classic" or "glass". */
+    fun homeStyle(ctx: Context): String = sp(ctx).getString("home_style", null) ?: STYLE_CLASSIC
+
+    fun setHomeStyle(ctx: Context, style: String) {
+        sp(ctx).edit().putString("home_style", style).apply()
+    }
+
+    /** Glass light/dark: [MODE_AUTO] follows the system. */
+    fun glassMode(ctx: Context): Int = sp(ctx).getInt("glass_mode", MODE_AUTO)
+
+    fun setGlassMode(ctx: Context, mode: Int) {
+        sp(ctx).edit().putInt("glass_mode", mode).apply()
+    }
+
+    const val STYLE_CLASSIC = "classic"
+    const val STYLE_GLASS = "glass"
+    const val MODE_AUTO = 0
+    const val MODE_LIGHT = 1
+    const val MODE_DARK = 2
+
     /** Decko Home's pages and dock as JSON; see [HomeLayout]. */
     fun homeLayout(ctx: Context): String? = sp(ctx).getString("home_layout", null)
 

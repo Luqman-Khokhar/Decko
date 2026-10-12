@@ -21,6 +21,7 @@ class FolderPanel(
     /** Long-press on an app inside the folder at the given home cell. */
     private val onLongPress: (AppEntry, View, HomeLayout.Cell) -> Unit,
     private val onRenamed: () -> Unit,
+    private val style: HomeStyle,
 ) {
     val name: EditText = overlay.findViewById(R.id.folder_name)
     private val card: View = overlay.findViewById(R.id.folder_card)
@@ -28,6 +29,9 @@ class FolderPanel(
     private val iconPx = (AppAdapter.ICON_DP * activity.resources.displayMetrics.density).toInt()
     private var folder: HomeItem.Folder? = null
     private var startScale = 1f
+
+    /** Glass blooms the card on a spring: 0 = folded into the icon, 1 = open. */
+    private val spring = Spring(SPRING_STIFFNESS, SPRING_DAMPING, onUpdate = ::applyOpen, onEnd = { if (!isOpen) hide() })
 
     var openCell: HomeLayout.Cell? = null
         private set
@@ -60,7 +64,15 @@ class FolderPanel(
                 card.pivotX = iconPos[0] + icon.width / 2f - cardPos[0]
                 card.pivotY = iconPos[1] + icon.height / 2f - cardPos[1]
                 startScale = icon.width / card.width.coerceAtLeast(1).toFloat()
-                if (!ValueAnimator.areAnimatorsEnabled()) return true
+                if (!ValueAnimator.areAnimatorsEnabled()) {
+                    style.onFolderProgress(activity, card, 1f)
+                    return true
+                }
+                if (style.springs) {
+                    applyOpen(0f)
+                    spring.animateTo(1f, 0f)
+                    return true
+                }
                 card.scaleX = startScale
                 card.scaleY = startScale
                 card.alpha = 0f
@@ -79,16 +91,31 @@ class FolderPanel(
         name.clearFocus()
         openCell = null
         folder = null
-        val done = Runnable {
-            overlay.visibility = View.GONE
-            overlay.alpha = 1f
-            card.scaleX = 1f
-            card.scaleY = 1f
-            card.alpha = 1f
-        }
+        val done = Runnable { hide() }
         if (!animate || !ValueAnimator.areAnimatorsEnabled()) return done.run()
+        if (style.springs) return spring.animateTo(0f, spring.value)
         card.animate().scaleX(startScale).scaleY(startScale).alpha(0f).setDuration(CLOSE_MS).setInterpolator(EMPHASIZED).start()
         overlay.animate().alpha(0f).setDuration(CLOSE_MS).withEndAction(done).start()
+    }
+
+    /** Card grows from the icon's size and spot; it fades in faster than it grows so it reads early. */
+    private fun applyOpen(p: Float) {
+        val scale = startScale + (1 - startScale) * p
+        card.scaleX = scale
+        card.scaleY = scale
+        card.alpha = (p * 2).coerceIn(0f, 1f)
+        overlay.alpha = (p * 1.5f).coerceIn(0f, 1f)
+        style.onFolderProgress(activity, card, p.coerceIn(0f, 1f))
+    }
+
+    private fun hide() {
+        spring.cancel()
+        overlay.visibility = View.GONE
+        overlay.alpha = 1f
+        card.scaleX = 1f
+        card.scaleY = 1f
+        card.alpha = 1f
+        style.onFolderProgress(activity, card, 0f)
     }
 
     private fun commitName() {
@@ -110,7 +137,11 @@ class FolderPanel(
         for (key in folder.apps) {
             val app = home.app(key) ?: continue
             val view = activity.layoutInflater.inflate(R.layout.item_app, grid, false)
-            view.findViewById<TextView>(R.id.label).text = app.label
+            view.findViewById<TextView>(R.id.label).apply {
+                text = app.label
+                style.panelText(activity)?.let(::setTextColor)
+            }
+            style.pressFeedback(view)
             view.contentDescription = if (app.isWork) activity.getString(R.string.work_app, app.label) else app.label
             Icons.load(activity, app, iconPx, view.findViewById<ImageView>(R.id.icon))
             view.foreground = ripple.getDrawable(0)
@@ -125,6 +156,8 @@ class FolderPanel(
     private companion object {
         const val OPEN_MS = 280L
         const val CLOSE_MS = 200L
+        const val SPRING_STIFFNESS = 420f
+        const val SPRING_DAMPING = 0.72f
         val EMPHASIZED = PathInterpolator(0.05f, 0.7f, 0.1f, 1f)
     }
 }

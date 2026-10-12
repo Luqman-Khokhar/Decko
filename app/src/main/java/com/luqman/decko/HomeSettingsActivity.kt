@@ -28,6 +28,21 @@ class HomeSettingsActivity : Activity() {
         setContentView(R.layout.activity_home)
         ConfigTabs.bind(this, ConfigTabs.HOME)
         packs = findViewById(R.id.packs)
+        findViewById<android.widget.RadioGroup>(R.id.glass_mode).apply {
+            check(when (Prefs.glassMode(this@HomeSettingsActivity)) {
+                Prefs.MODE_LIGHT -> R.id.mode_light
+                Prefs.MODE_DARK -> R.id.mode_dark
+                else -> R.id.mode_auto
+            })
+            setOnCheckedChangeListener { _, id ->
+                Prefs.setGlassMode(this@HomeSettingsActivity, when (id) {
+                    R.id.mode_light -> Prefs.MODE_LIGHT
+                    R.id.mode_dark -> Prefs.MODE_DARK
+                    else -> Prefs.MODE_AUTO
+                })
+            }
+        }
+        buildStyles()
         findViewById<Button>(R.id.set_default).setOnClickListener {
             if (roleRefused) HomeSetup.openSettings(this) else HomeSetup.request(this, REQ_HOME_ROLE)
         }
@@ -71,6 +86,56 @@ class HomeSettingsActivity : Activity() {
         val custom = Prefs.iconOverrideCount(this)
         findViewById<TextView>(R.id.custom_count).text = resources.getQuantityString(R.plurals.icon_custom_count, custom, custom)
         findViewById<View>(R.id.reset_custom).visibility = if (custom == 0) View.GONE else View.VISIBLE
+    }
+
+    /** Classic and Glass cards; the glass options only show while Glass is chosen. */
+    private fun buildStyles() {
+        val container = findViewById<LinearLayout>(R.id.styles)
+        container.removeAllViews()
+        val current = Prefs.homeStyle(this)
+        val choices = listOf(
+            Triple(Prefs.STYLE_CLASSIC, R.string.style_classic, R.string.style_classic_hint),
+            Triple(Prefs.STYLE_GLASS, R.string.style_glass, R.string.style_glass_hint),
+        )
+        for ((i, choice) in choices.withIndex()) {
+            val (id, title, hint) = choice
+            val chosen = id == current
+            val titleText = getString(title)
+            val card = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(dp(16), dp(16), dp(16), dp(16))
+                background = GradientDrawable().apply {
+                    cornerRadius = dp(20).toFloat()
+                    setColor(getColor(R.color.tile_bg))
+                    if (chosen) setStroke(dp(3), getColor(R.color.icon_bg))
+                }
+                foreground = obtainStyledAttributes(intArrayOf(android.R.attr.selectableItemBackground)).run { getDrawable(0).also { recycle() } }
+                isClickable = true
+                isFocusable = true
+                isSelected = chosen
+                addView(TextView(this@HomeSettingsActivity).apply {
+                    text = if (chosen) getString(R.string.current_design, titleText) else titleText
+                    textSize = 17f
+                    setTextColor(getColor(R.color.config_text))
+                    typeface = android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.NORMAL)
+                })
+                addView(TextView(this@HomeSettingsActivity).apply {
+                    setText(hint)
+                    textSize = 14f
+                    setTextColor(getColor(R.color.config_text_muted))
+                }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(4) })
+                setOnClickListener {
+                    Prefs.setHomeStyle(this@HomeSettingsActivity, id)
+                    buildStyles()
+                }
+            }
+            container.addView(card, LinearLayout.LayoutParams(0, -1, 1f).apply {
+                if (i > 0) marginStart = dp(8)
+            })
+        }
+        val glass = current == Prefs.STYLE_GLASS
+        findViewById<View>(R.id.glass_options).visibility = if (glass) View.VISIBLE else View.GONE
+        findViewById<View>(R.id.glass_backdrop_hint).visibility = if (glass && !GlassBackdrop.hasSource(this)) View.VISIBLE else View.GONE
     }
 
     /** Decko itself first, then apps spread across the alphabet, so each card previews a varied set. */

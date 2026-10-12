@@ -3,7 +3,9 @@ package com.luqman.decko
 import android.annotation.SuppressLint
 import android.app.Activity
 import android.app.ActivityOptions
+import android.content.Context
 import android.content.Intent
+import android.content.res.Configuration
 import android.content.pm.LauncherApps
 import android.graphics.Rect
 import android.net.Uri
@@ -36,6 +38,10 @@ class LauncherActivity : Activity() {
     private lateinit var home: HomeScreen
     private lateinit var drag: HomeDrag
     private lateinit var folder: FolderPanel
+    private lateinit var style: HomeStyle
+
+    /** Style and light/dark choice this activity was built with; a change in the Home tab rebuilds it. */
+    private var styleKey = ""
     private lateinit var search: EditText
     private lateinit var grid: GridView
     private lateinit var state: View
@@ -60,7 +66,21 @@ class LauncherActivity : Activity() {
         override fun onPackagesUnavailable(packageNames: Array<out String>, user: UserHandle, replacing: Boolean) = reload()
     }
 
+    /** Glass with a fixed Light or Dark choice overrides the system's night mode for this activity only. */
+    override fun attachBaseContext(newBase: Context) {
+        super.attachBaseContext(newBase)
+        val mode = Prefs.glassMode(newBase)
+        if (Prefs.homeStyle(newBase) != Prefs.STYLE_GLASS || mode == Prefs.MODE_AUTO) return
+        applyOverrideConfiguration(Configuration().apply {
+            val night = if (mode == Prefs.MODE_DARK) Configuration.UI_MODE_NIGHT_YES else Configuration.UI_MODE_NIGHT_NO
+            uiMode = (newBase.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK.inv()) or night
+        })
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
+        style = HomeStyle.of(this)
+        styleKey = currentStyleKey()
+        if (style === GlassStyle) setTheme(R.style.Theme_Decko_Launcher_Glass)
         super.onCreate(savedInstanceState)
         pendingIconKey = savedInstanceState?.getString(STATE_ICON_KEY)
         setContentView(R.layout.activity_launcher)
@@ -70,7 +90,7 @@ class LauncherActivity : Activity() {
         state = findViewById(R.id.drawer_state)
         launcherApps = getSystemService(LauncherApps::class.java)
 
-        adapter = AppAdapter(this)
+        adapter = AppAdapter(this, style)
         grid.adapter = adapter
         grid.setOnItemClickListener { _, view, position, _ -> launch(adapter.getItem(position), view) }
         grid.setOnItemLongClickListener { _, view, position, _ ->
@@ -89,11 +109,13 @@ class LauncherActivity : Activity() {
                 }
                 info?.let(::longPress)
             },
+            style = style,
         )
         folder = FolderPanel(
             this, findViewById(R.id.folder_overlay), home, ::launch,
             onLongPress = { app, view, cell -> longPress(HomeDrag.DragInfo(HomeItem.App(app.key), cell, view, app.label, app, fromFolder = true)) },
             onRenamed = ::saveHome,
+            style = style,
         )
         drag = HomeDrag(
             root, home, findViewById(R.id.remove_bar),
@@ -105,6 +127,20 @@ class LauncherActivity : Activity() {
         )
         root.setOnDragListener(drag)
 
+        style.dress(this, root)
+        root.springs = style.springs
+        var lastProgress = 0f
+        root.onProgress = { p ->
+            if (lastProgress == 0f && p > 0f) style.revealDrawer(grid)
+            lastProgress = p
+            style.onDrawerProgress(this, p)
+        }
+        if (style === GlassStyle) {
+            GlassBackdrop.onChanged = {
+                GlassStyle.matchWallpaper(this, root)
+                home.bind()
+            }
+        }
         root.drawerCanScrollUp = { grid.canScrollVertically(-1) }
         root.onDrawerStateChanged = ::onDrawerStateChanged
         findViewById<View>(R.id.open_drawer).setOnClickListener { root.open() }
@@ -132,6 +168,11 @@ class LauncherActivity : Activity() {
 
     override fun onResume() {
         super.onResume()
+        if (styleKey != currentStyleKey()) {
+            recreate()
+            return
+        }
+        if (style === GlassStyle) GlassBackdrop.refresh(this)
         home.clock.clockTheme = Prefs.appTheme(this)
         // Pack, clock design or overrides may have changed in the Home tab; cache keys pick that up on rebind.
         refreshIcons()
@@ -148,7 +189,27 @@ class LauncherActivity : Activity() {
         root.close(animate = onScreen)
     }
 
+    override fun onRestart() {
+        super.onRestart()
+        // Back from an app: home settles into place rather than just appearing.
+        if (!root.isDrawerOpen && !folder.isOpen) style.revealHome(findViewById(R.id.pager), findViewById(R.id.dock))
+    }
+
+    /** configChanges keeps us alive through night-mode switches; Glass following the system rebuilds to restyle. */
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        if (styleKey != currentStyleKey()) recreate()
+    }
+
+    private fun currentStyleKey(): String {
+        val glass = Prefs.homeStyle(this) == Prefs.STYLE_GLASS
+        val mode = Prefs.glassMode(this)
+        val night = applicationContext.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK
+        return if (!glass) "classic" else if (mode == Prefs.MODE_AUTO) "glass|auto|$night" else "glass|$mode"
+    }
+
     override fun onDestroy() {
+        if (GlassBackdrop.onChanged != null && style === GlassStyle) GlassBackdrop.onChanged = null
         launcherApps.unregisterCallback(appsChanged)
         super.onDestroy()
     }

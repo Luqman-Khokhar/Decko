@@ -1,0 +1,10 @@
+<resources>
+    <!-- Dark glass: dialogs, menus and the keyboard theme follow. -->
+    <style name="Theme.Decko.Launcher.Glass" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowShowWallpaper">true</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:colorAccent">@color/glass_text</item>
+    </style>
+</resources>

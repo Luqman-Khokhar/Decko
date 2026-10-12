@@ -16,6 +16,7 @@ class HomeScreen(
     private val onLaunch: (AppEntry, View) -> Unit,
     private val onOpenFolder: (HomeLayout.Cell, HomeItem.Folder, View) -> Unit,
     private val onLongPress: (HomeItem, View, HomeLayout.Cell) -> Unit,
+    private val style: HomeStyle,
 ) {
     var layout: HomeLayout? = null
         private set
@@ -41,6 +42,7 @@ class HomeScreen(
         dock.columns = HomeLayout.DOCK_SLOTS
         dock.rows = 1
         pager.onScroll = { indicator.position = it }
+        pager.pageTransform = style::transformPage
         bind()
     }
 
@@ -109,6 +111,7 @@ class HomeScreen(
     /** First four apps in a 2×2 preview, like the folder's open grid in miniature. */
     private fun folderIcon(folder: HomeItem.Folder, cell: HomeLayout.Cell): View {
         val view = activity.layoutInflater.inflate(R.layout.item_folder_icon, dock, false)
+        style.folderTile(activity)?.let { view.findViewById<View>(R.id.icon).background = it }
         val name = folderName(folder)
         label(view, name, cell)
         view.contentDescription = activity.resources.getQuantityString(R.plurals.folder_description, folder.apps.size, name, folder.apps.size)
@@ -131,8 +134,13 @@ class HomeScreen(
     }
 
     private fun label(view: View, text: String, cell: HomeLayout.Cell) {
+        style.pressFeedback(view)
         view.findViewById<TextView>(R.id.label).apply {
             this.text = text
+            style.homeLabel(activity)?.let { (color, shadow) ->
+                setTextColor(color)
+                setShadowLayer(if (shadow) 6f else 0f, 0f, 0f, activity.getColor(R.color.icon_bg))
+            }
             // The dock row is too short for labels; TalkBack still reads the name.
             visibility = if (cell.dock) View.GONE else View.VISIBLE
         }

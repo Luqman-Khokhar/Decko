@@ -24,6 +24,15 @@
         <item name="android:autoSizeMaxTextSize">15sp</item>
     </style>
 
+    <!-- Light glass; values-night has the dark twin. -->
+    <style name="Theme.Decko.Launcher.Glass" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowShowWallpaper">true</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:colorAccent">@color/glass_text</item>
+    </style>
+
     <style name="Theme.Decko.Launcher" parent="android:Theme.Material.Wallpaper.NoTitleBar">
         <item name="android:windowShowWallpaper">true</item>
         <item name="android:windowBackground">@android:color/transparent</item>

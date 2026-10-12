@@ -175,5 +175,15 @@
         <item quantity="one">Folder %1$s, %2$d app</item>
         <item quantity="other">Folder %1$s, %2$d apps</item>
     </plurals>
+    <string name="home_style">Home style</string>
+    <string name="style_classic">Classic</string>
+    <string name="style_classic_hint">Dark drawer, simple and fast.</string>
+    <string name="style_glass">Glass</string>
+    <string name="style_glass_hint">Frosted panes, light or dark, with fluid motion.</string>
+    <string name="glass_mode">Glass appearance</string>
+    <string name="glass_auto">Match system</string>
+    <string name="glass_light">Light</string>
+    <string name="glass_dark">Dark</string>
+    <string name="glass_backdrop_hint">For true frosted glass, set your wallpaper from Decko\'s Wallpapers tab. Other wallpapers get a tinted frost.</string>
     <string name="drop_to_remove">✕  Drop here to remove</string>
 </resources>
