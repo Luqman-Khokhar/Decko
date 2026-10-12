@@ -12,6 +12,10 @@
         android:name="android.permission.READ_EXTERNAL_STORAGE"
         android:maxSdkVersion="32" />
     <uses-permission android:name="android.permission.REQUEST_DELETE_PACKAGES" />
+    <!-- Glass control center: Wi-Fi state, Do Not Disturb, and (Classic) pulling down the system shade. -->
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY" />
+    <uses-permission android:name="android.permission.EXPAND_STATUS_BAR" />
 
     <!-- Decko Home lists launchable apps and checks the current home app; this grants exactly that visibility without QUERY_ALL_PACKAGES. -->
     <queries>
@@ -87,6 +91,37 @@
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
         </activity>
+
+        <activity
+            android:name=".WidgetPickerActivity"
+            android:exported="false"
+            android:label="@string/widgets_title"
+            android:theme="@style/Theme.Decko.Sheet" />
+
+        <!-- Receives "add widget to home screen" requests (requestPinAppWidget) while Decko Home is the default launcher. -->
+        <activity
+            android:name=".PinConfirmActivity"
+            android:excludeFromRecents="true"
+            android:exported="true"
+            android:taskAffinity=""
+            android:theme="@style/Theme.Decko.Translucent">
+            <intent-filter>
+                <action android:name="android.content.pm.action.CONFIRM_PIN_APPWIDGET" />
+            </intent-filter>
+        </activity>
+
+        <!-- Glass notification center. Disabled until the user turns it on, so Decko isn't listed for
+             notification access (or flagged) unless they choose it. -->
+        <service
+            android:name=".DeckoNotificationListener"
+            android:enabled="false"
+            android:exported="true"
+            android:label="@string/app_name"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
 
         <activity
             android:name=".HomeSettingsActivity"

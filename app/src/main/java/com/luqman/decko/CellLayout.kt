@@ -14,13 +14,16 @@ class CellLayout @JvmOverloads constructor(
     attrs: AttributeSet? = null,
 ) : ViewGroup(context, attrs) {
 
+    /** A block of cells: anchor [x],[y] and size [w]×[h]. */
+    data class Span(val x: Int, val y: Int, val w: Int = 1, val h: Int = 1)
+
     class LayoutParams(val x: Int, val y: Int, val spanX: Int = 1, val spanY: Int = 1) : ViewGroup.LayoutParams(MATCH_PARENT, MATCH_PARENT)
 
     var columns = HomeLayout.COLUMNS
     var rows = HomeLayout.ROWS
 
-    /** Cell outlined as the drop spot, or null. */
-    var dropHint: Pair<Int, Int>? = null
+    /** Cells outlined as the drop spot (a widget's whole footprint), or null. */
+    var dropHint: Span? = null
         set(value) { if (field != value) { field = value; invalidate() } }
 
     /** Occupied cell the dragged app would join as a folder, drawn as a filled circle; or null. */
@@ -40,8 +43,8 @@ class CellLayout @JvmOverloads constructor(
         setWillNotDraw(false)
     }
 
-    private val cellW get() = (width - paddingLeft - paddingRight) / columns.toFloat()
-    private val cellH get() = (height - paddingTop - paddingBottom) / rows.toFloat()
+    val cellW get() = (width - paddingLeft - paddingRight) / columns.toFloat()
+    val cellH get() = (height - paddingTop - paddingBottom) / rows.toFloat()
 
     /** Cell under a point in this view's coordinates, clamped to the grid. */
     fun cellAt(x: Float, y: Float): Pair<Int, Int> =
@@ -102,9 +105,12 @@ class CellLayout @JvmOverloads constructor(
             canvas.drawCircle(cx, cy, r, hintFill)
             canvas.drawCircle(cx, cy, r, hintStroke)
         }
-        val (x, y) = dropHint ?: return
+        val hint = dropHint ?: return
         val inset = 4 * density
-        hintRect.set(paddingLeft + x * cellW + inset, paddingTop + y * cellH + inset, paddingLeft + (x + 1) * cellW - inset, paddingTop + (y + 1) * cellH - inset)
+        hintRect.set(
+            paddingLeft + hint.x * cellW + inset, paddingTop + hint.y * cellH + inset,
+            paddingLeft + (hint.x + hint.w) * cellW - inset, paddingTop + (hint.y + hint.h) * cellH - inset,
+        )
         val radius = 16 * density
         canvas.drawRoundRect(hintRect, radius, radius, hintFill)
         canvas.drawRoundRect(hintRect, radius, radius, hintStroke)

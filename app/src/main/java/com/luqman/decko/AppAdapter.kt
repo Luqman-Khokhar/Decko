@@ -8,7 +8,7 @@ import android.widget.ImageView
 import android.widget.TextView
 
 /** App drawer cells: pack-rendered icon over the label. */
-class AppAdapter(private val activity: Activity) : BaseAdapter() {
+class AppAdapter(private val activity: Activity, private val style: HomeStyle) : BaseAdapter() {
     var apps: List<AppEntry> = emptyList()
         set(value) { field = value; notifyDataSetChanged() }
 
@@ -19,9 +19,12 @@ class AppAdapter(private val activity: Activity) : BaseAdapter() {
     override fun getItemId(position: Int) = position.toLong()
 
     override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
-        val view = convertView ?: activity.layoutInflater.inflate(R.layout.item_app, parent, false)
+        val view = convertView ?: activity.layoutInflater.inflate(R.layout.item_app, parent, false).also { style.pressFeedback(it) }
         val app = apps[position]
-        view.findViewById<TextView>(R.id.label).text = app.label
+        view.findViewById<TextView>(R.id.label).apply {
+            text = app.label
+            style.panelText(activity)?.let(::setTextColor)
+        }
         view.contentDescription = if (app.isWork) activity.getString(R.string.work_app, app.label) else app.label
         Icons.load(activity, app, iconPx, view.findViewById<ImageView>(R.id.icon))
         return view

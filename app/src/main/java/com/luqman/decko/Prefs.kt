@@ -121,6 +121,44 @@ object Prefs {
         p.edit().apply { p.all.keys.filter { it.startsWith("icon_o_") }.forEach { remove(it) } }.apply()
     }
 
+    /** System wallpaper id right after Decko set a library image on the home screen; see [GlassBackdrop]. */
+    fun homeWallpaperId(ctx: Context) = sp(ctx).getInt("home_wallpaper_id", -1)
+
+    fun setHomeWallpaperId(ctx: Context, id: Int) {
+        sp(ctx).edit().putInt("home_wallpaper_id", id).apply()
+    }
+
+    /** Decko Home look: "classic" or "glass". */
+    fun homeStyle(ctx: Context): String = sp(ctx).getString("home_style", null) ?: STYLE_CLASSIC
+
+    fun setHomeStyle(ctx: Context, style: String) {
+        sp(ctx).edit().putString("home_style", style).apply()
+    }
+
+    /** Glass light/dark: [MODE_AUTO] follows the system. */
+    fun glassMode(ctx: Context): Int = sp(ctx).getInt("glass_mode", MODE_AUTO)
+
+    fun setGlassMode(ctx: Context, mode: Int) {
+        sp(ctx).edit().putInt("glass_mode", mode).apply()
+    }
+
+    const val STYLE_CLASSIC = "classic"
+    const val STYLE_GLASS = "glass"
+    const val MODE_AUTO = 0
+    const val MODE_LIGHT = 1
+    const val MODE_DARK = 2
+
+    /** How often and how recently Decko Home opened [appKey], for App Library suggestions. */
+    fun recordLaunch(ctx: Context, appKey: String) {
+        val p = sp(ctx)
+        p.edit().putInt("launch_n_$appKey", p.getInt("launch_n_$appKey", 0) + 1)
+            .putLong("launch_t_$appKey", System.currentTimeMillis()).apply()
+    }
+
+    /** Launch count and last launch time; (0, 0) if never opened from Decko Home. */
+    fun launchStats(ctx: Context, appKey: String): Pair<Int, Long> =
+        sp(ctx).let { it.getInt("launch_n_$appKey", 0) to it.getLong("launch_t_$appKey", 0L) }
+
     /** Decko Home's pages and dock as JSON; see [HomeLayout]. */
     fun homeLayout(ctx: Context): String? = sp(ctx).getString("home_layout", null)
 

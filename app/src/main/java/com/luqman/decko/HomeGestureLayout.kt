@@ -27,6 +27,27 @@ class HomeGestureLayout @JvmOverloads constructor(
     var drawerCanScrollUp: () -> Boolean = { false }
     var onDrawerStateChanged: (open: Boolean) -> Unit = {}
 
+    /** Every progress change, for styles that react to the drawer's position (blur, re-aimed glass). */
+    var onProgress: (Float) -> Unit = {}
+
+    /** Settle on a spring that keeps the fling's velocity, instead of a fixed-length curve. */
+    var springs = false
+
+    /** Takes a downward pull on the home page, e.g. Glass's notification and control centers. */
+    interface PullDown {
+        /** A pull starts at [x]; return false to leave it alone. */
+        fun begin(x: Float, width: Int): Boolean
+        fun drag(distance: Float)
+        /** [velocity] in px/s, downward positive. */
+        fun release(velocity: Float, cancelled: Boolean)
+    }
+
+    var pullDown: PullDown? = null
+
+    /** True while something sits over home (an open folder or panel) that handles its own swipes. */
+    var blocked: () -> Boolean = { false }
+    private var pulling = false
+
     /** 0 = home page, 1 = drawer fully open. */
     var progress = 0f
         private set
@@ -42,6 +63,7 @@ class HomeGestureLayout @JvmOverloads constructor(
     private var dragging = false
     private var tracker: VelocityTracker? = null
     private var animator: ValueAnimator? = null
+    private val spring = Spring(SPRING_STIFFNESS, SPRING_DAMPING, onUpdate = { apply(it) })
     private var settledOpen = false
 
     override fun onFinishInflate() {
@@ -57,7 +79,7 @@ class HomeGestureLayout @JvmOverloads constructor(
 
     override fun onInterceptTouchEvent(ev: MotionEvent): Boolean {
         track(ev)
-        return dragging
+        return dragging || pulling
     }
 
     @Suppress("ClickableViewAccessibility") // The drawer also opens from the home page's "Apps" button.
@@ -73,18 +95,37 @@ class HomeGestureLayout @JvmOverloads constructor(
     private fun track(ev: MotionEvent) {
         when (ev.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
+                if (blocked()) {
+                    dragging = false
+                    pulling = false
+                    tracker?.recycle()
+                    tracker = null
+                    return
+                }
                 downX = ev.x
                 downY = ev.y
                 tracker?.recycle()
                 tracker = VelocityTracker.obtain().apply { addMovement(ev) }
                 // Catching the drawer mid-animation turns straight into a drag from where it is.
-                dragging = animator?.isRunning == true
+                dragging = animator?.isRunning == true || spring.isRunning
                 animator?.cancel()
+                spring.cancel()
                 startProgress = progress
+                pulling = false
             }
             MotionEvent.ACTION_MOVE -> {
+                if (tracker == null) return
                 tracker?.addMovement(ev)
                 val dy = ev.y - downY
+                if (!dragging && !pulling && progress == 0f && dy > slop && dy > abs(ev.x - downX) && pullDown?.begin(downX, width) == true) {
+                    pulling = true
+                    downY = ev.y
+                    parent?.requestDisallowInterceptTouchEvent(true)
+                }
+                if (pulling) {
+                    pullDown?.drag(ev.y - downY)
+                    return
+                }
                 // Mostly-horizontal moves belong to the home pager.
                 if (!dragging && abs(dy) > slop && abs(dy) > abs(ev.x - downX) && canStartDrag(dy)) {
                     dragging = true
@@ -95,6 +136,11 @@ class HomeGestureLayout @JvmOverloads constructor(
                 if (dragging) apply(startProgress - (ev.y - downY) / height.coerceAtLeast(1))
             }
             MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                if (pulling) {
+                    val v = tracker?.run { computeCurrentVelocity(1000); yVelocity } ?: 0f
+                    pullDown?.release(v, ev.actionMasked == MotionEvent.ACTION_CANCEL)
+                    pulling = false
+                }
                 if (dragging) {
                     val v = tracker?.run { computeCurrentVelocity(1000); yVelocity } ?: 0f
                     val open = when {
@@ -103,7 +149,8 @@ class HomeGestureLayout @JvmOverloads constructor(
                         v > flingVelocity -> false
                         else -> progress > 0.5f
                     }
-                    settle(if (open) 1f else 0f, true)
+                    // Upward finger speed is drawer progress per second.
+                    settle(if (open) 1f else 0f, true, -v / height.coerceAtLeast(1))
                 }
                 dragging = false
                 tracker?.recycle()
@@ -115,8 +162,13 @@ class HomeGestureLayout @JvmOverloads constructor(
     private fun canStartDrag(dy: Float) =
         (progress == 0f && dy < 0) || (progress == 1f && dy > 0 && !drawerCanScrollUp())
 
-    private fun settle(target: Float, animate: Boolean) {
+    private fun settle(target: Float, animate: Boolean, velocity: Float = 0f) {
         animator?.cancel()
+        spring.cancel()
+        if (springs && animate && progress != target) {
+            spring.animateTo(target, progress, velocity)
+            return
+        }
         if (!animate || !ValueAnimator.areAnimatorsEnabled() || progress == target) {
             apply(target)
             return
@@ -144,6 +196,7 @@ class HomeGestureLayout @JvmOverloads constructor(
         home.scaleY = home.scaleX
         home.translationY = -HOME_LIFT * h * progress
         home.visibility = if (progress == 1f) INVISIBLE else VISIBLE
+        onProgress(progress)
         if (progress == 1f && !settledOpen) {
             settledOpen = true
             onDrawerStateChanged(true)
@@ -159,6 +212,8 @@ class HomeGestureLayout @JvmOverloads constructor(
         const val MIN_DURATION_MS = 140L
         const val HOME_SHRINK = 0.06f
         const val HOME_LIFT = 0.04f
+        const val SPRING_STIFFNESS = 260f
+        const val SPRING_DAMPING = 0.92f
 
         /** Material 3 "emphasized decelerate". */
         val EMPHASIZED_DECELERATE = PathInterpolator(0.05f, 0.7f, 0.1f, 1f)

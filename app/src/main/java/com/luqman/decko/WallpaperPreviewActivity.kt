@@ -215,8 +215,13 @@ class WallpaperPreviewActivity : Activity() {
                 val left = (bounds.outWidth - cropW) / 2
                 val top = (bounds.outHeight - cropH) / 2
                 val hint = Rect(left, top, left + cropW, top + cropH)
-                FileInputStream(item.file).use { WallpaperManager.getInstance(appCtx).setStream(it, hint, true, flags) }
-                if (flags and WallpaperManager.FLAG_SYSTEM != 0) Prefs.setStaticApplied(appCtx, "home", item.id)
+                val wm = WallpaperManager.getInstance(appCtx)
+                FileInputStream(item.file).use { wm.setStream(it, hint, true, flags) }
+                if (flags and WallpaperManager.FLAG_SYSTEM != 0) {
+                    Prefs.setStaticApplied(appCtx, "home", item.id)
+                    // Lets Glass Home tell later whether this image is still the wallpaper, without reading it back.
+                    Prefs.setHomeWallpaperId(appCtx, wm.getWallpaperId(WallpaperManager.FLAG_SYSTEM))
+                }
                 if (flags and WallpaperManager.FLAG_LOCK != 0) Prefs.setStaticApplied(appCtx, "lock", item.id)
                 true
             } catch (e: Exception) {

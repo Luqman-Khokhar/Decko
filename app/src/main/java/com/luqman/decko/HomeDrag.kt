@@ -21,6 +21,8 @@ class HomeDrag(
     private val onMoveBegan: () -> Unit,
     private val onHold: (DragInfo) -> Unit,
     private val onChanged: () -> Unit,
+    /** A widget dropped on the remove bar: its id goes back to the widget host. */
+    private val onWidgetRemoved: (Int) -> Unit,
 ) : View.OnDragListener {
 
     /**
@@ -44,6 +46,7 @@ class HomeDrag(
     private var start = PointF()
     private var moved = false
     private var target: HomeLayout.Cell? = null
+    private var targetSpan = 1 to 1
     private var mergeInto: HomeLayout.Cell? = null
     private var overRemove = false
     private var flipDir = 0
@@ -112,16 +115,28 @@ class HomeDrag(
     /** Hovering an app or folder's center with an app means "put them together"; anywhere else lands in the nearest free cell. */
     private fun aim(info: DragInfo, cell: HomeLayout.Cell, grid: CellLayout, p: PointF) {
         val layout = home.layout ?: return
-        val occupant = layout.items[cell]
+        val item = info.item
+        targetSpan = item.spanX to item.spanY
+        if (item is HomeItem.Widget) {
+            // Widgets stay off the dock; on a page the finger holds the widget's middle, not its corner.
+            target = if (cell.dock) null else layout.nearestFree(
+                cell.copy(x = (cell.x - (item.spanX - 1) / 2).coerceAtLeast(0), y = (cell.y - (item.spanY - 1) / 2).coerceAtLeast(0)),
+                info.vacates, item.spanX, item.spanY,
+            )
+            mergeInto = null
+            return showHints()
+        }
+        val occupied = layout.occupantAt(cell)
+        val occupant = occupied?.first
         val center = grid.isNearCenter(p.x, p.y)
-        val canMerge = info.item is HomeItem.App && occupant != null && cell != info.from && center
-        if (info.fromFolder && cell == info.from && center) {
+        val canMerge = item is HomeItem.App && occupied != null && occupied.second !is HomeItem.Widget && occupant != info.from && center
+        if (info.fromFolder && occupant == info.from && center) {
             // Back onto its own folder: dropping there changes nothing.
             target = null
             mergeInto = null
         } else if (canMerge) {
             target = null
-            mergeInto = cell
+            mergeInto = occupant
         } else {
             target = layout.nearestFree(cell, info.vacates)
             mergeInto = null
@@ -135,8 +150,13 @@ class HomeDrag(
         val merge = mergeInto
         val to = target
         when {
-            overRemove && from != null ->
-                if (info.fromFolder) layout.removeFromFolder(from, (info.item as HomeItem.App).key) else layout.remove(from)
+            overRemove && from != null -> when {
+                info.fromFolder -> layout.removeFromFolder(from, (info.item as HomeItem.App).key)
+                else -> {
+                    layout.remove(from)
+                    (info.item as? HomeItem.Widget)?.let { onWidgetRemoved(it.id) }
+                }
+            }
             merge != null -> layout.merge(from, info.fromFolder, (info.item as HomeItem.App).key, merge)
             to != null -> {
                 if (info.fromFolder && from != null) layout.removeFromFolder(from, (info.item as HomeItem.App).key)
@@ -166,12 +186,14 @@ class HomeDrag(
     }
 
     private fun showHints() {
-        fun hint(cell: HomeLayout.Cell?, dock: Boolean, page: Int) = cell?.takeIf { it.dock == dock && (dock || it.page == page) }?.let { it.x to it.y }
-        home.dock.dropHint = hint(target, true, 0)
-        home.dock.mergeHint = hint(mergeInto, true, 0)
+        fun on(cell: HomeLayout.Cell?, dock: Boolean, page: Int) = cell?.takeIf { it.dock == dock && (dock || it.page == page) }
+        fun span(cell: HomeLayout.Cell?, dock: Boolean, page: Int) =
+            on(cell, dock, page)?.let { CellLayout.Span(it.x, it.y, targetSpan.first, targetSpan.second) }
+        home.dock.dropHint = span(target, true, 0)
+        home.dock.mergeHint = on(mergeInto, true, 0)?.let { it.x to it.y }
         for (i in 0 until home.pager.childCount) {
-            home.page(i).dropHint = hint(target, false, i)
-            home.page(i).mergeHint = hint(mergeInto, false, i)
+            home.page(i).dropHint = span(target, false, i)
+            home.page(i).mergeHint = on(mergeInto, false, i)?.let { it.x to it.y }
         }
     }
 

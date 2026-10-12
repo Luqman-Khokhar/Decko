@@ -27,6 +27,9 @@ class HomePager @JvmOverloads constructor(
     var currentPage = 0
         private set
 
+    /** Styles move pages in depth as they scroll; called with each page and its offset from center. */
+    var pageTransform: ((View, Float) -> Unit)? = null
+
     private val scroller = OverScroller(context, DecelerateInterpolator(1.6f))
     private val config = ViewConfiguration.get(context)
     private val slop = config.scaledTouchSlop
@@ -59,7 +62,11 @@ class HomePager @JvmOverloads constructor(
 
     override fun onScrollChanged(l: Int, t: Int, oldl: Int, oldt: Int) {
         super.onScrollChanged(l, t, oldl, oldt)
-        if (width > 0) onScroll(l / width.toFloat())
+        if (width > 0) {
+            val position = l / width.toFloat()
+            onScroll(position)
+            pageTransform?.let { t -> for (i in 0 until childCount) t(getChildAt(i), i - position) }
+        }
     }
 
     override fun computeScroll() {
@@ -154,7 +161,15 @@ class PageIndicator @JvmOverloads constructor(
 ) : View(context, attrs) {
 
     var count = 1
-        set(value) { field = value.coerceAtLeast(1); invalidate() }
+        set(value) {
+            field = value.coerceAtLeast(1)
+            if (hideWhenSingle) visibility = if (field < 2) INVISIBLE else VISIBLE
+            requestLayout()
+            invalidate()
+        }
+
+    /** Glass shows the dots in a pill, which shouldn't float empty over a single page. */
+    var hideWhenSingle = false
 
     /** Scroll position in pages, from [HomePager.onScroll]. */
     var position = 0f
@@ -164,17 +179,34 @@ class PageIndicator @JvmOverloads constructor(
     private val dot = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = context.getColor(R.color.controls_text_muted) }
     private val active = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = context.getColor(R.color.controls_text) }
 
+    fun setColors(dotColor: Int, activeColor: Int) {
+        dot.color = dotColor
+        active.color = activeColor
+        invalidate()
+    }
+
+    /** Wrap-content width fits the dots and padding, for a pill around them. */
+    override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+        val wanted = ((count - 1) * GAP_DP + 2 * DOT_DP * 1.4f) * density + paddingLeft + paddingRight
+        setMeasuredDimension(resolveSize(wanted.toInt(), widthMeasureSpec), MeasureSpec.getSize(heightMeasureSpec))
+    }
+
     init {
         importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_NO
     }
 
     override fun onDraw(canvas: Canvas) {
         if (count < 2) return
-        val r = 3 * density
-        val gap = 12 * density
+        val r = DOT_DP * density
+        val gap = GAP_DP * density
         val start = (width - gap * (count - 1)) / 2
         val cy = height / 2f
         for (i in 0 until count) canvas.drawCircle(start + i * gap, cy, r, dot)
         canvas.drawCircle(start + position.coerceIn(0f, count - 1f) * gap, cy, r * 1.4f, active)
+    }
+
+    private companion object {
+        const val DOT_DP = 3f
+        const val GAP_DP = 12f
     }
 }
