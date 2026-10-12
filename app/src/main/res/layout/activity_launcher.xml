@@ -11,22 +11,51 @@
         android:gravity="center_horizontal"
         android:orientation="vertical">
 
-        <com.luqman.decko.AnalogClockView
-            android:id="@+id/clock"
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="56dp">
+
+            <TextView
+                android:id="@+id/remove_bar"
+                android:layout_width="wrap_content"
+                android:layout_height="48dp"
+                android:layout_gravity="center"
+                android:background="@drawable/remove_bar_bg"
+                android:fontFamily="sans-serif-medium"
+                android:gravity="center"
+                android:paddingHorizontal="24dp"
+                android:text="@string/drop_to_remove"
+                android:textColor="@color/controls_text"
+                android:textSize="14sp"
+                android:visibility="gone" />
+        </FrameLayout>
+
+        <com.luqman.decko.HomePager
+            android:id="@+id/pager"
             android:layout_width="match_parent"
             android:layout_height="0dp"
-            android:layout_marginTop="48dp"
             android:layout_weight="1"
-            android:paddingHorizontal="48dp" />
+            android:paddingHorizontal="8dp" />
+
+        <com.luqman.decko.PageIndicator
+            android:id="@+id/indicator"
+            android:layout_width="match_parent"
+            android:layout_height="24dp" />
+
+        <com.luqman.decko.CellLayout
+            android:id="@+id/dock"
+            android:layout_width="match_parent"
+            android:layout_height="88dp"
+            android:layout_marginHorizontal="12dp"
+            android:background="@drawable/dock_bg"
+            android:paddingHorizontal="4dp" />
 
         <TextView
             android:id="@+id/open_drawer"
             android:layout_width="wrap_content"
-            android:layout_height="56dp"
-            android:layout_marginBottom="16dp"
+            android:layout_height="48dp"
             android:background="?android:attr/selectableItemBackgroundBorderless"
             android:clickable="true"
-            android:drawablePadding="4dp"
             android:focusable="true"
             android:fontFamily="sans-serif-medium"
             android:gravity="center"
@@ -116,4 +145,57 @@
             </LinearLayout>
         </FrameLayout>
     </LinearLayout>
+
+    <FrameLayout
+        android:id="@+id/folder_overlay"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@color/scrim"
+        android:clickable="true"
+        android:contentDescription="@string/close_folder"
+        android:focusable="true"
+        android:visibility="gone">
+
+        <LinearLayout
+            android:id="@+id/folder_card"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:layout_marginHorizontal="24dp"
+            android:layout_marginVertical="96dp"
+            android:accessibilityPaneTitle="@string/folder_default"
+            android:background="@drawable/folder_panel_bg"
+            android:clickable="true"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <EditText
+                android:id="@+id/folder_name"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:autofillHints=""
+                android:background="@null"
+                android:fontFamily="sans-serif-medium"
+                android:gravity="center"
+                android:hint="@string/folder_name"
+                android:imeOptions="actionDone|flagNoExtractUi"
+                android:inputType="textCapWords|textNoSuggestions"
+                android:maxLines="1"
+                android:textColor="@color/controls_text"
+                android:textColorHint="@color/controls_text_muted"
+                android:textSize="20sp" />
+
+            <ScrollView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp">
+
+                <GridLayout
+                    android:id="@+id/folder_grid"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:columnCount="4" />
+            </ScrollView>
+        </LinearLayout>
+    </FrameLayout>
 </com.luqman.decko.HomeGestureLayout>
