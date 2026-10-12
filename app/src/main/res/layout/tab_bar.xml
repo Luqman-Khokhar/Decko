@@ -2,6 +2,7 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
+    android:baselineAligned="false"
     android:orientation="horizontal"
     android:paddingHorizontal="16dp">
 
@@ -24,4 +25,9 @@
         android:id="@+id/tab_header"
         style="@style/ConfigTab"
         android:text="@string/tab_header" />
+
+    <TextView
+        android:id="@+id/tab_home"
+        style="@style/ConfigTab"
+        android:text="@string/tab_home" />
 </LinearLayout>

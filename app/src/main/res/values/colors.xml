@@ -3,6 +3,7 @@
     <color name="controls_text">#FFF4F4F2</color>
     <color name="controls_surface">#FF232326</color>
     <color name="controls_ripple">#33FFFFFF</color>
+    <color name="controls_text_muted">#FFA8A7A2</color>
     <color name="config_bg">#FFF6F5F2</color>
     <color name="config_text">#FF1F1F1F</color>
     <color name="config_text_muted">#FF5C5B57</color>
