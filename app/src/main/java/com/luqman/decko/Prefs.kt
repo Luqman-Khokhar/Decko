@@ -148,6 +148,17 @@ object Prefs {
     const val MODE_LIGHT = 1
     const val MODE_DARK = 2
 
+    /** How often and how recently Decko Home opened [appKey], for App Library suggestions. */
+    fun recordLaunch(ctx: Context, appKey: String) {
+        val p = sp(ctx)
+        p.edit().putInt("launch_n_$appKey", p.getInt("launch_n_$appKey", 0) + 1)
+            .putLong("launch_t_$appKey", System.currentTimeMillis()).apply()
+    }
+
+    /** Launch count and last launch time; (0, 0) if never opened from Decko Home. */
+    fun launchStats(ctx: Context, appKey: String): Pair<Int, Long> =
+        sp(ctx).let { it.getInt("launch_n_$appKey", 0) to it.getLong("launch_t_$appKey", 0L) }
+
     /** Decko Home's pages and dock as JSON; see [HomeLayout]. */
     fun homeLayout(ctx: Context): String? = sp(ctx).getString("home_layout", null)
 

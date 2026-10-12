@@ -53,6 +53,9 @@ class LauncherActivity : Activity() {
     private var placeWhenLoaded = -1
     private var resizeFrame: WidgetResizeFrame? = null
     private lateinit var menuAnchor: View
+
+    /** Glass's App Library, in place of the classic grid; null in Classic. */
+    private var library: AppLibrary? = null
     private lateinit var search: EditText
     private lateinit var grid: GridView
     private lateinit var state: View
@@ -131,7 +134,17 @@ class LauncherActivity : Activity() {
             onLongPress = { app, view, cell -> longPress(HomeDrag.DragInfo(HomeItem.App(app.key), cell, view, app.label, app, fromFolder = true)) },
             onRenamed = ::saveHome,
             style = style,
+            onGroupLongPress = { app, view -> longPress(HomeDrag.DragInfo(HomeItem.App(app.key), null, view, app.label, app)) },
         )
+        if (style === GlassStyle) {
+            library = AppLibrary(
+                this, grid.parent as android.widget.FrameLayout, search, ::launch,
+                onLongPress = { app, view -> longPress(HomeDrag.DragInfo(HomeItem.App(app.key), null, view, app.label, app)) },
+                onOpenCategory = { title, apps, view -> folder.openGroup(title, apps, view) },
+            )
+            grid.visibility = View.GONE
+            search.setOnFocusChangeListener { _, focused -> if (focused) library?.searchMode = true }
+        }
         drag = HomeDrag(
             root, home, findViewById(R.id.remove_bar),
             // Editable text accepts any drop; text fields stay closed to drops while an icon is dragged.
@@ -150,7 +163,7 @@ class LauncherActivity : Activity() {
         root.springs = style.springs
         var lastProgress = 0f
         root.onProgress = { p ->
-            if (lastProgress == 0f && p > 0f) style.revealDrawer(grid)
+            if (lastProgress == 0f && p > 0f) library?.reveal() ?: style.revealDrawer(grid)
             lastProgress = p
             style.onDrawerProgress(this, p)
         }
@@ -162,7 +175,14 @@ class LauncherActivity : Activity() {
         }
         root.drawerCanScrollUp = { grid.canScrollVertically(-1) }
         root.onDrawerStateChanged = ::onDrawerStateChanged
-        findViewById<View>(R.id.open_drawer).setOnClickListener { root.open() }
+        findViewById<View>(R.id.open_drawer).setOnClickListener {
+            root.open()
+            // Glass's capsule is a search box: open straight into typing.
+            if (library != null) {
+                search.requestFocus()
+                getSystemService(InputMethodManager::class.java).showSoftInput(search, 0)
+            }
+        }
         findViewById<Button>(R.id.drawer_retry).setOnClickListener { reload() }
 
         search.addTextChangedListener(object : TextWatcher {
@@ -171,8 +191,14 @@ class LauncherActivity : Activity() {
             override fun afterTextChanged(s: Editable?) = applyFilter()
         })
         search.setOnEditorActionListener { _, action, _ ->
-            if (action != EditorInfo.IME_ACTION_GO || adapter.count == 0) return@setOnEditorActionListener false
-            launch(adapter.getItem(0), grid.getChildAt(-grid.firstVisiblePosition) ?: search)
+            if (action != EditorInfo.IME_ACTION_GO) return@setOnEditorActionListener false
+            val lib = library
+            if (lib != null) {
+                lib.firstResult()?.let { launch(it, search) } ?: return@setOnEditorActionListener false
+            } else {
+                if (adapter.count == 0) return@setOnEditorActionListener false
+                launch(adapter.getItem(0), grid.getChildAt(-grid.firstVisiblePosition) ?: search)
+            }
             true
         }
 
@@ -258,7 +284,9 @@ class LauncherActivity : Activity() {
 
     /** Back never leaves the home screen, but a preview opened from the Home tab can close. */
     private fun handleBack() {
-        if (resizeFrame != null) resizeFrame?.dismiss() else if (folder.isOpen) folder.close() else if (root.isDrawerOpen) root.close() else if (!HomeSetup.isDefaultHome(this)) finish()
+        if (resizeFrame != null) resizeFrame?.dismiss() else if (folder.isOpen) folder.close()
+        else if (root.isDrawerOpen && library?.handleBack() == true) Unit
+        else if (root.isDrawerOpen) root.close() else if (!HomeSetup.isDefaultHome(this)) finish()
     }
 
     private fun onDrawerStateChanged(open: Boolean) {
@@ -267,6 +295,7 @@ class LauncherActivity : Activity() {
             search.clearFocus()
             getSystemService(InputMethodManager::class.java).hideSoftInputFromWindow(search.windowToken, 0)
             grid.setSelection(0)
+            library?.reset()
         }
     }
 
@@ -293,6 +322,7 @@ class LauncherActivity : Activity() {
         val query = search.text.toString().trim()
         val shown = if (query.isEmpty()) all else all.filter { it.label.contains(query, ignoreCase = true) }
         adapter.apps = shown
+        library?.setApps(all, query)
         when {
             loadFailed && all.isEmpty() -> showState(message = getString(R.string.drawer_error), retry = true)
             shown.isEmpty() && query.isNotEmpty() -> showState(message = getString(R.string.drawer_no_match, query))
@@ -313,6 +343,7 @@ class LauncherActivity : Activity() {
 
     /** Opens the app growing out of its icon. */
     private fun launch(app: AppEntry, from: View) {
+        Prefs.recordLaunch(this, app.key)
         val icon = from.findViewById<View>(R.id.icon) ?: from
         val bounds = Rect().also { icon.getGlobalVisibleRect(it) }
         val options = ActivityOptions.makeScaleUpAnimation(icon, 0, 0, icon.width, icon.height).toBundle()

@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Glass Home's app list, swapped in for the classic grid: category cards, or A–Z while searching. -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/library"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <ScrollView
+        android:id="@+id/lib_scroll"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:clipToPadding="false"
+        android:paddingBottom="24dp">
+
+        <LinearLayout
+            android:id="@+id/lib_content"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingHorizontal="16dp"
+            android:paddingTop="12dp" />
+    </ScrollView>
+
+    <FrameLayout
+        android:id="@+id/lib_az"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:visibility="gone">
+
+        <ListView
+            android:id="@+id/lib_list"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:clipToPadding="false"
+            android:divider="@null"
+            android:paddingStart="16dp"
+            android:paddingEnd="36dp"
+            android:paddingBottom="24dp"
+            android:scrollbars="none" />
+
+        <com.luqman.decko.LetterScrubber
+            android:id="@+id/lib_scrubber"
+            android:layout_width="wrap_content"
+            android:layout_height="match_parent"
+            android:layout_gravity="end"
+            android:layout_marginEnd="6dp"
+            android:paddingVertical="16dp" />
+
+        <TextView
+            android:id="@+id/lib_bubble"
+            android:layout_width="64dp"
+            android:layout_height="64dp"
+            android:layout_gravity="end"
+            android:layout_marginEnd="44dp"
+            android:fontFamily="sans-serif-medium"
+            android:gravity="center"
+            android:importantForAccessibility="no"
+            android:textSize="28sp"
+            android:visibility="gone" />
+    </FrameLayout>
+</FrameLayout>

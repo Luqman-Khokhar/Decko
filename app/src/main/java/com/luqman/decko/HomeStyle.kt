@@ -7,6 +7,7 @@ import android.content.res.Configuration
 import android.graphics.drawable.Drawable
 import android.os.Build
 import android.view.View
+import android.view.ViewGroup
 import android.view.WindowInsetsController
 import android.view.WindowManager
 import android.view.animation.PathInterpolator
@@ -78,7 +79,6 @@ object GlassStyle : HomeStyle {
             setTextColor(text)
             setHintTextColor(muted)
         }
-        root.findViewById<View>(R.id.dock).background = GlassDrawable(activity, 32f)
         root.findViewById<TextView>(R.id.remove_bar).apply {
             background = GlassDrawable(activity, 24f)
             setTextColor(text)
@@ -90,6 +90,42 @@ object GlassStyle : HomeStyle {
             setHintTextColor(muted)
         }
         root.findViewById<TextView>(R.id.drawer_message).setTextColor(text)
+        // Home: a glass search capsule replaces the "Apps" hint, and the page dots sit in a glass pill.
+        root.findViewById<TextView>(R.id.open_drawer).apply {
+            setText(R.string.search_capsule)
+            background = GlassDrawable(activity, 22f)
+            setTextColor(text)
+            setShadowLayer(0f, 0f, 0f, 0)
+            val icon = activity.getDrawable(R.drawable.ic_search)?.mutate()?.apply { setTint(text) }
+            setCompoundDrawablesRelativeWithIntrinsicBounds(icon, null, null, null)
+            compoundDrawablePadding = (8 * activity.resources.displayMetrics.density).toInt()
+            val p = (22 * activity.resources.displayMetrics.density).toInt()
+            setPadding(p, 0, p, 0)
+            layoutParams = (layoutParams as ViewGroup.MarginLayoutParams).apply {
+                height = (46 * activity.resources.displayMetrics.density).toInt()
+                bottomMargin = (12 * activity.resources.displayMetrics.density).toInt()
+            }
+        }
+        root.findViewById<PageIndicator>(R.id.indicator).apply {
+            hideWhenSingle = true
+            background = GlassDrawable(activity, 10f)
+            setColors(muted, text)
+            val p = (10 * activity.resources.displayMetrics.density).toInt()
+            setPadding(p, 0, p, 0)
+            layoutParams = (layoutParams as ViewGroup.MarginLayoutParams).apply {
+                width = ViewGroup.LayoutParams.WRAP_CONTENT
+                height = (20 * activity.resources.displayMetrics.density).toInt()
+                bottomMargin = (10 * activity.resources.displayMetrics.density).toInt()
+            }
+        }
+        root.findViewById<View>(R.id.dock).apply {
+            background = GlassDrawable(activity, 34f)
+            layoutParams = (layoutParams as ViewGroup.MarginLayoutParams).apply {
+                marginStart = (16 * activity.resources.displayMetrics.density).toInt()
+                marginEnd = marginStart
+                bottomMargin = (12 * activity.resources.displayMetrics.density).toInt()
+            }
+        }
         if (Build.VERSION.SDK_INT >= 29) {
             activity.window.isStatusBarContrastEnforced = false
             activity.window.isNavigationBarContrastEnforced = false
@@ -97,13 +133,8 @@ object GlassStyle : HomeStyle {
         matchWallpaper(activity, root)
     }
 
-    /** Status-bar icons and the Apps hint follow the wallpaper's brightness, which may arrive after [dress]. */
+    /** Status-bar icons follow the wallpaper's brightness, which may arrive after [dress]. */
     fun matchWallpaper(activity: Activity, root: View) {
-        val (label, shadow) = homeLabel(activity)
-        root.findViewById<TextView>(R.id.open_drawer).apply {
-            setTextColor(label)
-            setShadowLayer(if (shadow) 6f else 0f, 0f, 0f, activity.getColor(R.color.icon_bg))
-        }
         applyBars(activity)
     }
 

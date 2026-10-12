@@ -200,5 +200,21 @@
     <string name="resize">Resize</string>
     <string name="widget_settings">Widget settings</string>
     <string name="resize_done">Done resizing</string>
+    <string name="search_capsule">Search</string>
+    <string name="suggestions">Suggestions</string>
+    <string name="recently_added">Recently added</string>
+    <string name="open_category">Open %1$s</string>
+    <string name="cat_social">Social</string>
+    <string name="cat_ai">AI &amp; Assistants</string>
+    <string name="cat_entertainment">Entertainment</string>
+    <string name="cat_games">Games</string>
+    <string name="cat_photo">Photo &amp; Video</string>
+    <string name="cat_finance">Finance</string>
+    <string name="cat_shopping">Shopping &amp; Food</string>
+    <string name="cat_travel">Travel</string>
+    <string name="cat_productivity">Productivity</string>
+    <string name="cat_news">News &amp; Reading</string>
+    <string name="cat_utilities">Utilities</string>
+    <string name="cat_other">Other</string>
     <string name="drop_to_remove">✕  Drop here to remove</string>
 </resources>

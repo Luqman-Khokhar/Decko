@@ -12,7 +12,10 @@ import android.widget.GridLayout
 import android.widget.ImageView
 import android.widget.TextView
 
-/** An open folder: its apps in a card over a scrim, grown out of the folder icon. The name is edited in place. */
+/**
+ * An open folder: its apps in a card over a scrim, grown out of the folder icon. The name is edited in place.
+ * Also shows an App Library category ([openGroup]): same card, read-only title.
+ */
 class FolderPanel(
     private val activity: Activity,
     private val overlay: View,
@@ -22,6 +25,8 @@ class FolderPanel(
     private val onLongPress: (AppEntry, View, HomeLayout.Cell) -> Unit,
     private val onRenamed: () -> Unit,
     private val style: HomeStyle,
+    /** Long-press on an app in an open category, which isn't on home. */
+    private val onGroupLongPress: (AppEntry, View) -> Unit = { _, _ -> },
 ) {
     val name: EditText = overlay.findViewById(R.id.folder_name)
     private val card: View = overlay.findViewById(R.id.folder_card)
@@ -35,7 +40,8 @@ class FolderPanel(
 
     var openCell: HomeLayout.Cell? = null
         private set
-    val isOpen get() = openCell != null
+    private var groupOpen = false
+    val isOpen get() = openCell != null || groupOpen
 
     init {
         overlay.setOnClickListener { close() }
@@ -51,8 +57,29 @@ class FolderPanel(
     fun open(cell: HomeLayout.Cell, folder: HomeItem.Folder, from: View) {
         openCell = cell
         this.folder = folder
+        setTitleEditable(true)
         name.setText(folder.name)
-        fill(folder, cell)
+        fill(folder.apps.mapNotNull(home::app)) { app, view -> onLongPress(app, view, cell) }
+        bloomFrom(from)
+    }
+
+    /** A library category: its apps, titled, not renamable. */
+    fun openGroup(title: String, apps: List<AppEntry>, from: View) {
+        groupOpen = true
+        folder = null
+        setTitleEditable(false)
+        name.setText(title)
+        fill(apps, onGroupLongPress)
+        bloomFrom(from)
+    }
+
+    private fun setTitleEditable(editable: Boolean) {
+        name.isFocusableInTouchMode = editable
+        name.isFocusable = editable
+        name.isCursorVisible = editable
+    }
+
+    private fun bloomFrom(from: View) {
         overlay.visibility = View.VISIBLE
         val icon = from.findViewById<View>(R.id.icon) ?: from
         // Measure first, then pivot the card on the folder icon so it grows out of it.
@@ -90,6 +117,7 @@ class FolderPanel(
         hideKeyboard()
         name.clearFocus()
         openCell = null
+        groupOpen = false
         folder = null
         val done = Runnable { hide() }
         if (!animate || !ValueAnimator.areAnimatorsEnabled()) return done.run()
@@ -131,11 +159,10 @@ class FolderPanel(
         activity.getSystemService(InputMethodManager::class.java).hideSoftInputFromWindow(name.windowToken, 0)
     }
 
-    private fun fill(folder: HomeItem.Folder, cell: HomeLayout.Cell) {
+    private fun fill(apps: List<AppEntry>, longPress: (AppEntry, View) -> Unit) {
         grid.removeAllViews()
         val ripple = activity.obtainStyledAttributes(intArrayOf(android.R.attr.selectableItemBackgroundBorderless))
-        for (key in folder.apps) {
-            val app = home.app(key) ?: continue
+        for (app in apps) {
             val view = activity.layoutInflater.inflate(R.layout.item_app, grid, false)
             view.findViewById<TextView>(R.id.label).apply {
                 text = app.label
@@ -147,7 +174,7 @@ class FolderPanel(
             view.foreground = ripple.getDrawable(0)
             view.isFocusable = true
             view.setOnClickListener { onLaunch(app, view) }
-            view.setOnLongClickListener { onLongPress(app, view, cell); true }
+            view.setOnLongClickListener { longPress(app, view); true }
             grid.addView(view, GridLayout.LayoutParams(GridLayout.spec(GridLayout.UNDEFINED), GridLayout.spec(GridLayout.UNDEFINED, 1f)).apply { width = 0 })
         }
         ripple.recycle()
