@@ -36,6 +36,7 @@ class HomeGestureLayout @JvmOverloads constructor(
     private lateinit var drawer: View
     private val slop = ViewConfiguration.get(context).scaledTouchSlop
     private val flingVelocity = FLING_DP_PER_S * resources.displayMetrics.density
+    private var downX = 0f
     private var downY = 0f
     private var startProgress = 0f
     private var dragging = false
@@ -72,6 +73,7 @@ class HomeGestureLayout @JvmOverloads constructor(
     private fun track(ev: MotionEvent) {
         when (ev.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
+                downX = ev.x
                 downY = ev.y
                 tracker?.recycle()
                 tracker = VelocityTracker.obtain().apply { addMovement(ev) }
@@ -83,7 +85,8 @@ class HomeGestureLayout @JvmOverloads constructor(
             MotionEvent.ACTION_MOVE -> {
                 tracker?.addMovement(ev)
                 val dy = ev.y - downY
-                if (!dragging && abs(dy) > slop && canStartDrag(dy)) {
+                // Mostly-horizontal moves belong to the home pager.
+                if (!dragging && abs(dy) > slop && abs(dy) > abs(ev.x - downX) && canStartDrag(dy)) {
                     dragging = true
                     startProgress = progress
                     downY = ev.y

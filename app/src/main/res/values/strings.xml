@@ -165,4 +165,15 @@
     <string name="icon_default">Icon pack default</string>
     <string name="app_info">App info</string>
     <string name="uninstall">Uninstall</string>
+    <string name="remove_from_home">Remove from home</string>
+    <string name="add_to_home">Add to home screen</string>
+    <string name="added_to_home">Added to your home screen</string>
+    <string name="folder_default">Folder</string>
+    <string name="folder_name">Folder name</string>
+    <string name="close_folder">Close folder</string>
+    <plurals name="folder_description">
+        <item quantity="one">Folder %1$s, %2$d app</item>
+        <item quantity="other">Folder %1$s, %2$d apps</item>
+    </plurals>
+    <string name="drop_to_remove">✕  Drop here to remove</string>
 </resources>

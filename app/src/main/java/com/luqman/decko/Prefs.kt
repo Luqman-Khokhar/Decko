@@ -121,6 +121,13 @@ object Prefs {
         p.edit().apply { p.all.keys.filter { it.startsWith("icon_o_") }.forEach { remove(it) } }.apply()
     }
 
+    /** Decko Home's pages and dock as JSON; see [HomeLayout]. */
+    fun homeLayout(ctx: Context): String? = sp(ctx).getString("home_layout", null)
+
+    fun setHomeLayout(ctx: Context, json: String) {
+        sp(ctx).edit().putString("home_layout", json).apply()
+    }
+
     /** Status-bar overlay settings. */
     fun header(ctx: Context): HeaderConfig {
         val p = sp(ctx)

@@ -4,6 +4,11 @@
     <color name="controls_surface">#FF232326</color>
     <color name="controls_ripple">#33FFFFFF</color>
     <color name="controls_text_muted">#FFA8A7A2</color>
+    <color name="dock_bg">#33FFFFFF</color>
+    <color name="drop_hint">#26FFFFFF</color>
+    <color name="folder_bg">#59FFFFFF</color>
+    <color name="scrim">#80000000</color>
+    <color name="remove_target">#FFB23A24</color>
     <color name="config_bg">#FFF6F5F2</color>
     <color name="config_text">#FF1F1F1F</color>
     <color name="config_text_muted">#FF5C5B57</color>

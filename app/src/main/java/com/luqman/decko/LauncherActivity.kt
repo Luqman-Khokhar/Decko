@@ -10,10 +10,12 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.UserHandle
+import android.os.UserManager
 import android.text.Editable
 import android.text.TextWatcher
 import android.view.View
 import android.view.WindowInsets
+import android.view.accessibility.AccessibilityManager
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethodManager
 import android.widget.Button
@@ -25,10 +27,15 @@ import android.widget.TextView
 import android.widget.Toast
 import android.window.OnBackInvokedDispatcher
 
-/** Decko Home: the wallpaper, the clock in the current design, and a swipe-up app drawer drawn with the chosen icon pack. */
+/**
+ * Decko Home: pages of apps over the wallpaper with the clock on the first, a dock, and a swipe-up
+ * app drawer, all drawn with the chosen icon pack. Long-press drags an app; holding still opens its menu.
+ */
 class LauncherActivity : Activity() {
     private lateinit var root: HomeGestureLayout
-    private lateinit var clock: AnalogClockView
+    private lateinit var home: HomeScreen
+    private lateinit var drag: HomeDrag
+    private lateinit var folder: FolderPanel
     private lateinit var search: EditText
     private lateinit var grid: GridView
     private lateinit var state: View
@@ -39,7 +46,14 @@ class LauncherActivity : Activity() {
     private var pendingIconKey: String? = null
 
     private val appsChanged = object : LauncherApps.Callback() {
-        override fun onPackageRemoved(packageName: String, user: UserHandle) = reload()
+        override fun onPackageRemoved(packageName: String, user: UserHandle) {
+            home.layout?.let {
+                it.removePackage(packageName, getSystemService(UserManager::class.java).getSerialNumberForUser(user))
+                it.trimPages()
+                it.save(this@LauncherActivity)
+            }
+            reload()
+        }
         override fun onPackageAdded(packageName: String, user: UserHandle) = reload()
         override fun onPackageChanged(packageName: String, user: UserHandle) = reload()
         override fun onPackagesAvailable(packageNames: Array<out String>, user: UserHandle, replacing: Boolean) = reload()
@@ -51,7 +65,6 @@ class LauncherActivity : Activity() {
         pendingIconKey = savedInstanceState?.getString(STATE_ICON_KEY)
         setContentView(R.layout.activity_launcher)
         root = findViewById(R.id.root)
-        clock = findViewById(R.id.clock)
         search = findViewById(R.id.search)
         grid = findViewById(R.id.apps)
         state = findViewById(R.id.drawer_state)
@@ -60,7 +73,37 @@ class LauncherActivity : Activity() {
         adapter = AppAdapter(this)
         grid.adapter = adapter
         grid.setOnItemClickListener { _, view, position, _ -> launch(adapter.getItem(position), view) }
-        grid.setOnItemLongClickListener { _, view, position, _ -> showAppMenu(adapter.getItem(position), view); true }
+        grid.setOnItemLongClickListener { _, view, position, _ ->
+            val app = adapter.getItem(position)
+            longPress(HomeDrag.DragInfo(HomeItem.App(app.key), null, view, app.label, app))
+            true
+        }
+
+        home = HomeScreen(
+            this, findViewById(R.id.pager), findViewById(R.id.dock), findViewById(R.id.indicator), ::launch,
+            onOpenFolder = { cell, f, view -> folder.open(cell, f, view) },
+            onLongPress = { item, view, cell ->
+                val info = when (item) {
+                    is HomeItem.App -> home.app(item.key)?.let { HomeDrag.DragInfo(item, cell, view, it.label, it) }
+                    is HomeItem.Folder -> HomeDrag.DragInfo(item, cell, view, home.folderName(item))
+                }
+                info?.let(::longPress)
+            },
+        )
+        folder = FolderPanel(
+            this, findViewById(R.id.folder_overlay), home, ::launch,
+            onLongPress = { app, view, cell -> longPress(HomeDrag.DragInfo(HomeItem.App(app.key), cell, view, app.label, app, fromFolder = true)) },
+            onRenamed = ::saveHome,
+        )
+        drag = HomeDrag(
+            root, home, findViewById(R.id.remove_bar),
+            // Editable text accepts any drop; text fields stay closed to drops while an icon is dragged.
+            onActive = { search.isCursorVisible = !it; folder.name.isCursorVisible = !it },
+            onMoveBegan = { folder.close() },
+            onHold = ::onHold,
+            onChanged = ::saveHome,
+        )
+        root.setOnDragListener(drag)
 
         root.drawerCanScrollUp = { grid.canScrollVertically(-1) }
         root.onDrawerStateChanged = ::onDrawerStateChanged
@@ -89,15 +132,20 @@ class LauncherActivity : Activity() {
 
     override fun onResume() {
         super.onResume()
-        clock.clockTheme = Prefs.appTheme(this)
+        home.clock.clockTheme = Prefs.appTheme(this)
         // Pack, clock design or overrides may have changed in the Home tab; cache keys pick that up on rebind.
-        adapter.notifyDataSetChanged()
+        refreshIcons()
     }
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         // Home pressed: animate back to the home page if we're on screen, otherwise just be there when the app closes.
-        if (Intent.ACTION_MAIN == intent.action) root.close(animate = hasWindowFocus())
+        // Already on the home pages, it returns to the first one, like other launchers.
+        if (Intent.ACTION_MAIN != intent.action) return
+        val onScreen = hasWindowFocus()
+        if (onScreen && !root.isDrawerOpen && !folder.isOpen) home.pager.snapTo(0)
+        folder.close(animate = onScreen)
+        root.close(animate = onScreen)
     }
 
     override fun onDestroy() {
@@ -115,7 +163,7 @@ class LauncherActivity : Activity() {
 
     /** Back never leaves the home screen, but a preview opened from the Home tab can close. */
     private fun handleBack() {
-        if (root.isDrawerOpen) root.close() else if (!HomeSetup.isDefaultHome(this)) finish()
+        if (folder.isOpen) folder.close() else if (root.isDrawerOpen) root.close() else if (!HomeSetup.isDefaultHome(this)) finish()
     }
 
     private fun onDrawerStateChanged(open: Boolean) {
@@ -135,6 +183,7 @@ class LauncherActivity : Activity() {
                 if (isDestroyed) return@runOnUiThread
                 loadFailed = result.isFailure
                 all = result.getOrDefault(all)
+                if (result.isSuccess) home.setData(home.layout ?: HomeLayout.load(this, all), all)
                 applyFilter()
             }
         }
@@ -174,14 +223,56 @@ class LauncherActivity : Activity() {
         }
     }
 
-    private fun showAppMenu(app: AppEntry, anchor: View) {
+    private fun refreshIcons() {
+        adapter.notifyDataSetChanged()
+        home.bind()
+    }
+
+    private fun saveHome() {
+        home.layout?.save(this)
+        home.bind()
+    }
+
+    /** Drag to place or move; TalkBack users can't drag, so they get what holding still gives: a menu, or the folder. */
+    private fun longPress(info: HomeDrag.DragInfo) {
+        if (getSystemService(AccessibilityManager::class.java).isTouchExplorationEnabled) {
+            onHold(info)
+        } else {
+            drag.start(info, info.anchor.findViewById(R.id.icon) ?: info.anchor)
+        }
+    }
+
+    private fun onHold(info: HomeDrag.DragInfo) {
+        val app = info.app
+        val cell = info.from
+        if (app != null) {
+            showAppMenu(app, info.anchor, cell, info.fromFolder)
+        } else if (cell != null && info.item is HomeItem.Folder) {
+            folder.open(cell, info.item, info.anchor)
+        }
+    }
+
+    /** [cell] is where the app sits on home (inside the folder there when [inFolder]), or null in the drawer. */
+    private fun showAppMenu(app: AppEntry, anchor: View, cell: HomeLayout.Cell?, inFolder: Boolean = false) {
         PopupMenu(this, anchor).apply {
+            if (cell == null) menu.add(0, MENU_ADD, 0, R.string.add_to_home) else menu.add(0, MENU_REMOVE, 0, R.string.remove_from_home)
             menu.add(0, MENU_ICON, 0, R.string.change_icon)
             menu.add(0, MENU_INFO, 1, R.string.app_info)
             if (!app.isSystem) menu.add(0, MENU_UNINSTALL, 2, R.string.uninstall)
             setOnMenuItemClickListener {
                 when (it.itemId) {
-                    MENU_ICON -> IconPicker.show(this@LauncherActivity, app, onPickImage = { pickImage(app) }, onChanged = { adapter.notifyDataSetChanged() })
+                    MENU_ADD -> addToHome(app)
+                    MENU_REMOVE -> home.layout?.let { l ->
+                        if (inFolder) {
+                            l.removeFromFolder(cell!!, app.key)
+                            folder.close()
+                        } else {
+                            l.remove(cell!!)
+                        }
+                        l.trimPages()
+                        saveHome()
+                    }
+                    MENU_ICON -> IconPicker.show(this@LauncherActivity, app, onPickImage = { pickImage(app) }, onChanged = ::refreshIcons)
                     MENU_INFO -> launcherApps.startAppDetailsActivity(app.component, app.user, Rect().also { r -> anchor.getGlobalVisibleRect(r) }, null)
                     MENU_UNINSTALL -> startActivity(
                         Intent(Intent.ACTION_DELETE, Uri.fromParts("package", app.component.packageName, null))
@@ -192,6 +283,16 @@ class LauncherActivity : Activity() {
             }
             show()
         }
+    }
+
+    private fun addToHome(app: AppEntry) {
+        val layout = home.layout ?: return
+        val cell = layout.firstFree()
+        layout.move(null, HomeItem.App(app.key), cell)
+        saveHome()
+        root.close()
+        home.pager.snapTo(cell.page)
+        Toast.makeText(this, R.string.added_to_home, Toast.LENGTH_SHORT).show()
     }
 
     private fun pickImage(app: AppEntry) {
@@ -208,7 +309,7 @@ class LauncherActivity : Activity() {
         Apps.io.execute {
             val ok = Icons.saveCustom(this, key, uri)
             runOnUiThread {
-                if (ok) adapter.notifyDataSetChanged() else Toast.makeText(this, R.string.import_failed, Toast.LENGTH_SHORT).show()
+                if (ok) refreshIcons() else Toast.makeText(this, R.string.import_failed, Toast.LENGTH_SHORT).show()
             }
         }
     }
@@ -241,5 +342,7 @@ class LauncherActivity : Activity() {
         const val MENU_ICON = 1
         const val MENU_INFO = 2
         const val MENU_UNINSTALL = 3
+        const val MENU_ADD = 4
+        const val MENU_REMOVE = 5
     }
 }
