@@ -24,6 +24,19 @@
         <item name="android:autoSizeMaxTextSize">15sp</item>
     </style>
 
+    <style name="Theme.Decko.Sheet" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/controls_bg</item>
+        <item name="android:colorAccent">@color/controls_text</item>
+    </style>
+
+    <!-- Invisible host for a dialog, e.g. confirming a widget pin over whatever app asked. -->
+    <style name="Theme.Decko.Translucent" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:backgroundDimEnabled">false</item>
+    </style>
+
     <!-- Light glass; values-night has the dark twin. -->
     <style name="Theme.Decko.Launcher.Glass" parent="android:Theme.Material.Light.NoActionBar">
         <item name="android:windowShowWallpaper">true</item>

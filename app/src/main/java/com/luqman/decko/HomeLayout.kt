@@ -8,17 +8,24 @@ import android.provider.MediaStore
 import org.json.JSONArray
 import org.json.JSONObject
 
-/** What a home cell holds: one app, or a folder of apps (by [AppEntry.key]). */
+/** What a home cell holds: one app, a folder of apps (by [AppEntry.key]), or an app widget. */
 sealed class HomeItem {
     data class App(val key: String) : HomeItem()
 
     /** Empty [name] shows as the default "Folder". A folder always holds at least two apps. */
     class Folder(var name: String, val apps: MutableList<String>) : HomeItem()
+
+    /** A bound widget [id] from [provider] (flattened component), covering [spanX]×[spanY] cells from its anchor. */
+    data class Widget(val id: Int, val provider: String, override val spanX: Int, override val spanY: Int) : HomeItem()
+
+    open val spanX get() = 1
+    open val spanY get() = 1
 }
 
 /**
- * Where each app and folder sits on the home pages and in the dock.
- * The top [CLOCK_ROWS] of page 0 belong to the clock. The same app may sit in several cells.
+ * Where each app, folder and widget sits on the home pages and in the dock, keyed by its anchor
+ * (top-left) cell. Widgets cover several cells; the dock holds only single-cell items.
+ * The same app may sit in several cells.
  */
 class HomeLayout private constructor(private val cells: LinkedHashMap<Cell, HomeItem>, pages: Int) {
     data class Cell(val dock: Boolean, val page: Int, val x: Int, val y: Int)
@@ -28,41 +35,58 @@ class HomeLayout private constructor(private val cells: LinkedHashMap<Cell, Home
 
     val items: Map<Cell, HomeItem> get() = cells
 
-    fun isReserved(cell: Cell) = !cell.dock && cell.page == 0 && cell.y < CLOCK_ROWS
-
     private fun inBounds(c: Cell) =
         if (c.dock) c.page == 0 && c.y == 0 && c.x in 0 until DOCK_SLOTS
         else c.page in 0 until pages && c.x in 0 until COLUMNS && c.y in 0 until ROWS
 
-    /** [ignoring] counts as free: it's the cell an item is being dragged out of. */
-    fun isFree(cell: Cell, ignoring: Cell? = null) =
-        inBounds(cell) && !isReserved(cell) && (cell !in cells || cell == ignoring)
+    /** The anchor and item covering [cell], counting a widget's whole area. */
+    fun occupantAt(cell: Cell): Pair<Cell, HomeItem>? = cells.entries.firstOrNull { (a, item) ->
+        a.dock == cell.dock && a.page == cell.page && cell.x in a.x until a.x + item.spanX && cell.y in a.y until a.y + item.spanY
+    }?.let { it.key to it.value }
 
-    /** Free cell closest to [cell] on the same page (or in the dock), or null when that's full. */
-    fun nearestFree(cell: Cell, ignoring: Cell? = null): Cell? {
+    /** [ignoring] counts as free: it's the anchor an item is being dragged out of. */
+    fun isFree(cell: Cell, ignoring: Cell? = null) =
+        inBounds(cell) && occupantAt(cell)?.first.let { it == null || it == ignoring }
+
+    /** Whether a [spanX]×[spanY] item fits with its anchor at [anchor]. */
+    fun fits(anchor: Cell, spanX: Int, spanY: Int, ignoring: Cell? = null): Boolean {
+        if (anchor.dock && (spanX > 1 || spanY > 1)) return false
+        for (dx in 0 until spanX) for (dy in 0 until spanY) {
+            if (!isFree(anchor.copy(x = anchor.x + dx, y = anchor.y + dy), ignoring)) return false
+        }
+        return true
+    }
+
+    /** Anchor closest to [cell] on the same page (or in the dock) where the item fits, or null when it can't. */
+    fun nearestFree(cell: Cell, ignoring: Cell? = null, spanX: Int = 1, spanY: Int = 1): Cell? {
         val candidates = if (cell.dock) {
             (0 until DOCK_SLOTS).map { Cell(true, 0, it, 0) }
         } else {
             (0 until ROWS).flatMap { y -> (0 until COLUMNS).map { x -> Cell(false, cell.page, x, y) } }
         }
-        return candidates.filter { isFree(it, ignoring) }
+        return candidates.filter { fits(it, spanX, spanY, ignoring) }
             .minByOrNull { (it.x - cell.x) * (it.x - cell.x) + (it.y - cell.y) * (it.y - cell.y) }
     }
 
-    /** First free cell in reading order across the pages, opening a new page when all are full. */
-    fun firstFree(): Cell {
-        for (p in 0 until pages) for (y in 0 until ROWS) for (x in 0 until COLUMNS) {
-            Cell(false, p, x, y).takeIf { isFree(it) }?.let { return it }
+    /** First place in reading order across the pages, starting at [fromPage], opening a new page when all are full. */
+    fun firstFree(spanX: Int = 1, spanY: Int = 1, fromPage: Int = 0): Cell {
+        for (p in (fromPage until pages) + (0 until fromPage)) for (y in 0 until ROWS) for (x in 0 until COLUMNS) {
+            Cell(false, p, x, y).takeIf { fits(it, spanX, spanY) }?.let { return it }
         }
         return Cell(false, addPage(), 0, 0)
     }
 
     fun pageHasItems(page: Int) = cells.keys.any { !it.dock && it.page == page }
 
-    /** Puts [item] at [to]; [from] is the cell it was dragged out of, or null when it comes from the drawer. */
+    /** Puts [item] at [to]; [from] is the anchor it was dragged out of, or null when it comes from elsewhere. */
     fun move(from: Cell?, item: HomeItem, to: Cell) {
         from?.let { cells.remove(it) }
         cells[to] = item
+    }
+
+    /** Swaps the item at [anchor] for [item] in place, e.g. a widget after resizing. */
+    fun replace(anchor: Cell, item: HomeItem) {
+        cells[anchor] = item
     }
 
     /**
@@ -74,6 +98,7 @@ class HomeLayout private constructor(private val cells: LinkedHashMap<Cell, Home
         when (val target = cells[onto]) {
             is HomeItem.App -> cells[onto] = HomeItem.Folder("", mutableListOf(target.key, key))
             is HomeItem.Folder -> target.apps.add(key)
+            is HomeItem.Widget -> Unit
             null -> cells[onto] = HomeItem.App(key)
         }
     }
@@ -94,14 +119,19 @@ class HomeLayout private constructor(private val cells: LinkedHashMap<Cell, Home
 
     fun addPage(): Int = pages++
 
-    /** Uninstalled package: drop its icons for that user (serial from [Apps.load]'s key). */
-    fun removePackage(packageName: String, userSerial: Long) {
+    /**
+     * Uninstalled package: drop its icons for that user (serial from [Apps.load]'s key) and its widgets.
+     * Returns the removed widget ids, which the caller must release from the widget host.
+     */
+    fun removePackage(packageName: String, userSerial: Long): List<Int> {
         fun gone(key: String) = key.startsWith("$packageName/") && key.endsWith("#$userSerial")
         // Folders first: one can collapse into a single app that the second pass may also remove.
         for ((cell, item) in cells.entries.toList()) {
             if (item is HomeItem.Folder) item.apps.filter(::gone).forEach { removeFromFolder(cell, it) }
         }
-        cells.entries.removeAll { (_, item) -> item is HomeItem.App && gone(item.key) }
+        val widgets = cells.values.filterIsInstance<HomeItem.Widget>().filter { it.provider.startsWith("$packageName/") }
+        cells.entries.removeAll { (_, item) -> (item is HomeItem.App && gone(item.key)) || item in widgets }
+        return widgets.map { it.id }
     }
 
     /** Closes empty pages after the first; the rest keep their order. */
@@ -121,6 +151,7 @@ class HomeLayout private constructor(private val cells: LinkedHashMap<Cell, Home
             when (item) {
                 is HomeItem.App -> o.put("k", item.key)
                 is HomeItem.Folder -> o.put("f", item.name).put("a", JSONArray(item.apps))
+                is HomeItem.Widget -> o.put("w", item.id).put("pv", item.provider).put("sx", item.spanX).put("sy", item.spanY)
             }
             list.put(o)
         }
@@ -131,7 +162,6 @@ class HomeLayout private constructor(private val cells: LinkedHashMap<Cell, Home
         const val COLUMNS = 4
         const val ROWS = 5
         const val DOCK_SLOTS = 4
-        const val CLOCK_ROWS = 2
 
         /** Saved layout, or on first run a dock of the phone's dialer, messages, browser and camera. */
         fun load(ctx: Context, apps: List<AppEntry>): HomeLayout {
@@ -152,11 +182,13 @@ class HomeLayout private constructor(private val cells: LinkedHashMap<Cell, Home
             for (i in 0 until list.length()) {
                 val o = list.getJSONObject(i)
                 val cell = Cell(o.getBoolean("d"), o.getInt("p"), o.getInt("x"), o.getInt("y"))
-                cells[cell] = if (o.has("f")) {
-                    val apps = o.getJSONArray("a")
-                    HomeItem.Folder(o.getString("f"), MutableList(apps.length()) { apps.getString(it) })
-                } else {
-                    HomeItem.App(o.getString("k"))
+                cells[cell] = when {
+                    o.has("w") -> HomeItem.Widget(o.getInt("w"), o.getString("pv"), o.getInt("sx"), o.getInt("sy"))
+                    o.has("f") -> {
+                        val apps = o.getJSONArray("a")
+                        HomeItem.Folder(o.getString("f"), MutableList(apps.length()) { apps.getString(it) })
+                    }
+                    else -> HomeItem.App(o.getString("k"))
                 }
             }
             return HomeLayout(cells, json.getInt("pages"))

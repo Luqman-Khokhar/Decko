@@ -3,6 +3,9 @@ package com.luqman.decko
 import android.annotation.SuppressLint
 import android.app.Activity
 import android.app.ActivityOptions
+import android.content.ComponentName
+import android.appwidget.AppWidgetProviderInfo
+import android.appwidget.AppWidgetManager
 import android.content.Context
 import android.content.Intent
 import android.content.res.Configuration
@@ -42,6 +45,14 @@ class LauncherActivity : Activity() {
 
     /** Style and light/dark choice this activity was built with; a change in the Home tab rebuilds it. */
     private var styleKey = ""
+
+    /** Widget id between binding/configuring and placing, kept across process death. */
+    private var pendingWidgetId = -1
+
+    /** A pinned widget that arrived before the layout finished loading. */
+    private var placeWhenLoaded = -1
+    private var resizeFrame: WidgetResizeFrame? = null
+    private lateinit var menuAnchor: View
     private lateinit var search: EditText
     private lateinit var grid: GridView
     private lateinit var state: View
@@ -55,6 +66,7 @@ class LauncherActivity : Activity() {
         override fun onPackageRemoved(packageName: String, user: UserHandle) {
             home.layout?.let {
                 it.removePackage(packageName, getSystemService(UserManager::class.java).getSerialNumberForUser(user))
+                    .forEach(Widgets.host(this@LauncherActivity)::deleteAppWidgetId)
                 it.trimPages()
                 it.save(this@LauncherActivity)
             }
@@ -83,6 +95,7 @@ class LauncherActivity : Activity() {
         if (style === GlassStyle) setTheme(R.style.Theme_Decko_Launcher_Glass)
         super.onCreate(savedInstanceState)
         pendingIconKey = savedInstanceState?.getString(STATE_ICON_KEY)
+        pendingWidgetId = savedInstanceState?.getInt(STATE_WIDGET_ID, -1) ?: -1
         setContentView(R.layout.activity_launcher)
         root = findViewById(R.id.root)
         search = findViewById(R.id.search)
@@ -106,10 +119,12 @@ class LauncherActivity : Activity() {
                 val info = when (item) {
                     is HomeItem.App -> home.app(item.key)?.let { HomeDrag.DragInfo(item, cell, view, it.label, it) }
                     is HomeItem.Folder -> HomeDrag.DragInfo(item, cell, view, home.folderName(item))
+                    is HomeItem.Widget -> HomeDrag.DragInfo(item, cell, view, getString(R.string.menu_widgets))
                 }
                 info?.let(::longPress)
             },
             style = style,
+            onPageLongPress = ::showHomeMenu,
         )
         folder = FolderPanel(
             this, findViewById(R.id.folder_overlay), home, ::launch,
@@ -124,8 +139,12 @@ class LauncherActivity : Activity() {
             onMoveBegan = { folder.close() },
             onHold = ::onHold,
             onChanged = ::saveHome,
+            onWidgetRemoved = { Widgets.host(this).deleteAppWidgetId(it) },
         )
         root.setOnDragListener(drag)
+        menuAnchor = View(this).also { root.addView(it, android.widget.FrameLayout.LayoutParams(1, 1)) }
+        Widgets.host(this).onProvidersChanged = { home.bind() }
+        if (intent?.action == ACTION_PLACE_WIDGET) placeWhenLoaded = intent.getIntExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, -1)
 
         style.dress(this, root)
         root.springs = style.springs
@@ -173,13 +192,27 @@ class LauncherActivity : Activity() {
             return
         }
         if (style === GlassStyle) GlassBackdrop.refresh(this)
-        home.clock.clockTheme = Prefs.appTheme(this)
         // Pack, clock design or overrides may have changed in the Home tab; cache keys pick that up on rebind.
         refreshIcons()
     }
 
+    override fun onStart() {
+        super.onStart()
+        // Widgets only update a host that's listening; startListening also refreshes ones that changed meanwhile.
+        runCatching { Widgets.host(this).startListening() }
+    }
+
+    override fun onStop() {
+        runCatching { Widgets.host(this).stopListening() }
+        super.onStop()
+    }
+
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
+        if (intent.action == ACTION_PLACE_WIDGET) {
+            placeWidget(intent.getIntExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, -1))
+            return
+        }
         // Home pressed: animate back to the home page if we're on screen, otherwise just be there when the app closes.
         // Already on the home pages, it returns to the first one, like other launchers.
         if (Intent.ACTION_MAIN != intent.action) return
@@ -217,6 +250,7 @@ class LauncherActivity : Activity() {
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
         outState.putString(STATE_ICON_KEY, pendingIconKey)
+        outState.putInt(STATE_WIDGET_ID, pendingWidgetId)
     }
 
     @SuppressLint("GestureBackNavigation") // Only reached below Android 13; newer versions use the callback registered in onCreate.
@@ -224,7 +258,7 @@ class LauncherActivity : Activity() {
 
     /** Back never leaves the home screen, but a preview opened from the Home tab can close. */
     private fun handleBack() {
-        if (folder.isOpen) folder.close() else if (root.isDrawerOpen) root.close() else if (!HomeSetup.isDefaultHome(this)) finish()
+        if (resizeFrame != null) resizeFrame?.dismiss() else if (folder.isOpen) folder.close() else if (root.isDrawerOpen) root.close() else if (!HomeSetup.isDefaultHome(this)) finish()
     }
 
     private fun onDrawerStateChanged(open: Boolean) {
@@ -244,7 +278,12 @@ class LauncherActivity : Activity() {
                 if (isDestroyed) return@runOnUiThread
                 loadFailed = result.isFailure
                 all = result.getOrDefault(all)
-                if (result.isSuccess) home.setData(home.layout ?: HomeLayout.load(this, all), all)
+                if (result.isSuccess) {
+                    val first = home.layout == null
+                    home.setData(home.layout ?: HomeLayout.load(this, all), all)
+                    if (first) releaseOrphanWidgets()
+                    if (placeWhenLoaded != -1) placeWidget(placeWhenLoaded).also { placeWhenLoaded = -1 }
+                }
                 applyFilter()
             }
         }
@@ -299,7 +338,9 @@ class LauncherActivity : Activity() {
         if (getSystemService(AccessibilityManager::class.java).isTouchExplorationEnabled) {
             onHold(info)
         } else {
-            drag.start(info, info.anchor.findViewById(R.id.icon) ?: info.anchor)
+            // A widget's own views may reuse our R.id values, so widgets are dragged whole.
+            val shadow = if (info.item is HomeItem.Widget) info.anchor else info.anchor.findViewById(R.id.icon) ?: info.anchor
+            drag.start(info, shadow)
         }
     }
 
@@ -310,7 +351,135 @@ class LauncherActivity : Activity() {
             showAppMenu(app, info.anchor, cell, info.fromFolder)
         } else if (cell != null && info.item is HomeItem.Folder) {
             folder.open(cell, info.item, info.anchor)
+        } else if (cell != null && info.item is HomeItem.Widget) {
+            showWidgetMenu(info.item, info.anchor, cell)
         }
+    }
+
+    /** Long-press on empty home space: widgets, wallpaper and home settings. */
+    private fun showHomeMenu(screenX: Float, screenY: Float) {
+        val rootPos = IntArray(2).also { root.getLocationOnScreen(it) }
+        menuAnchor.x = screenX - rootPos[0]
+        menuAnchor.y = screenY - rootPos[1]
+        PopupMenu(this, menuAnchor).apply {
+            menu.add(0, MENU_WIDGETS, 0, R.string.menu_widgets)
+            menu.add(0, MENU_WALLPAPER, 1, R.string.menu_wallpaper)
+            menu.add(0, MENU_SETTINGS, 2, R.string.menu_home_settings)
+            setOnMenuItemClickListener {
+                when (it.itemId) {
+                    MENU_WIDGETS -> {
+                        val (cw, ch) = home.cellSize()
+                        startActivityForResult(Intent(this@LauncherActivity, WidgetPickerActivity::class.java)
+                            .putExtra(WidgetPickerActivity.EXTRA_CELL_W, cw).putExtra(WidgetPickerActivity.EXTRA_CELL_H, ch), REQ_PICK_WIDGET)
+                    }
+                    MENU_WALLPAPER -> startActivity(Intent.createChooser(Intent(Intent.ACTION_SET_WALLPAPER), getString(R.string.menu_wallpaper)))
+                    MENU_SETTINGS -> startActivity(Intent(this@LauncherActivity, HomeSettingsActivity::class.java))
+                }
+                true
+            }
+            show()
+        }
+    }
+
+    private fun showWidgetMenu(widget: HomeItem.Widget, anchor: View, cell: HomeLayout.Cell) {
+        val info = Widgets.manager(this).getAppWidgetInfo(widget.id)
+        PopupMenu(this, anchor).apply {
+            if (info != null && info.resizeMode != AppWidgetProviderInfo.RESIZE_NONE) menu.add(0, MENU_RESIZE, 0, R.string.resize)
+            if (info != null && Build.VERSION.SDK_INT >= 28 && info.configure != null &&
+                info.widgetFeatures and AppWidgetProviderInfo.WIDGET_FEATURE_RECONFIGURABLE != 0) {
+                menu.add(0, MENU_WIDGET_SETTINGS, 1, R.string.widget_settings)
+            }
+            menu.add(0, MENU_REMOVE, 2, R.string.remove_from_home)
+            setOnMenuItemClickListener {
+                when (it.itemId) {
+                    MENU_RESIZE -> info?.let { i -> startResize(widget, cell, i) }
+                    MENU_WIDGET_SETTINGS -> runCatching {
+                        Widgets.host(this@LauncherActivity).startAppWidgetConfigureActivityForResult(this@LauncherActivity, widget.id, 0, REQ_RECONFIGURE, null)
+                    }
+                    MENU_REMOVE -> home.layout?.let { l ->
+                        l.remove(cell)
+                        l.trimPages()
+                        Widgets.host(this@LauncherActivity).deleteAppWidgetId(widget.id)
+                        saveHome()
+                    }
+                }
+                true
+            }
+            show()
+        }
+    }
+
+    private fun startResize(widget: HomeItem.Widget, start: HomeLayout.Cell, info: AppWidgetProviderInfo) {
+        val view = home.widget(widget.id) ?: return
+        val page = home.page(start.page)
+        var anchor = start
+        var current = widget
+        val frame = WidgetResizeFrame(this, onCommit = { x, y, sx, sy ->
+            val layout = home.layout
+            val to = HomeLayout.Cell(false, anchor.page, x, y)
+            if (layout == null || !layout.fits(to, sx, sy, ignoring = anchor)) return@WidgetResizeFrame false
+            val resized = current.copy(spanX = sx, spanY = sy)
+            layout.move(anchor, resized, to)
+            anchor = to
+            current = resized
+            saveHome()
+            true
+        }, onDone = { resizeFrame = null })
+        resizeFrame = frame
+        frame.show(root, view, page, start.x, start.y, widget.spanX, widget.spanY, info, Widgets.resizeLimits(info, page.cellW, page.cellH))
+    }
+
+    /** From the picker: bind (asking once for permission if needed), configure if the widget wants it, then place. */
+    private fun addWidget(provider: ComponentName, profile: UserHandle) {
+        val id = Widgets.host(this).allocateAppWidgetId()
+        pendingWidgetId = id
+        if (Widgets.manager(this).bindAppWidgetIdIfAllowed(id, profile, provider, null)) {
+            configureOrPlace(id)
+        } else {
+            startActivityForResult(Intent(AppWidgetManager.ACTION_APPWIDGET_BIND)
+                .putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, id)
+                .putExtra(AppWidgetManager.EXTRA_APPWIDGET_PROVIDER, provider)
+                .putExtra(AppWidgetManager.EXTRA_APPWIDGET_PROVIDER_PROFILE, profile), REQ_BIND_WIDGET)
+        }
+    }
+
+    private fun configureOrPlace(id: Int) {
+        val info = Widgets.manager(this).getAppWidgetInfo(id) ?: return dropPending(id)
+        if (!Widgets.needsConfigure(info)) return placeWidget(id)
+        try {
+            Widgets.host(this).startAppWidgetConfigureActivityForResult(this, id, 0, REQ_CONFIGURE_WIDGET, null)
+        } catch (e: Exception) {
+            // A broken or missing settings screen shouldn't lose the widget.
+            placeWidget(id)
+        }
+    }
+
+    private fun dropPending(id: Int) {
+        Widgets.host(this).deleteAppWidgetId(id)
+        pendingWidgetId = -1
+    }
+
+    /** Ids the host holds but no home cell uses (a cancelled add, a crash mid-bind) are given back. */
+    private fun releaseOrphanWidgets() {
+        val used = home.layout?.items?.values?.filterIsInstance<HomeItem.Widget>()?.map { it.id }?.toSet() ?: return
+        val host = Widgets.host(this)
+        host.appWidgetIds.filter { it !in used && it != pendingWidgetId && it != placeWhenLoaded }.forEach(host::deleteAppWidgetId)
+    }
+
+    /** Puts bound widget [id] on the page in view, or the first page with room. */
+    private fun placeWidget(id: Int) {
+        pendingWidgetId = -1
+        if (id == -1) return
+        val layout = home.layout ?: run { placeWhenLoaded = id; return }
+        val info = Widgets.manager(this).getAppWidgetInfo(id) ?: return
+        val (cw, ch) = home.cellSize()
+        val (sx, sy) = Widgets.spanFor(info, cw, ch)
+        val cell = layout.firstFree(sx, sy, fromPage = home.pager.currentPage)
+        layout.move(null, HomeItem.Widget(id, info.provider.flattenToShortString(), sx, sy), cell)
+        folder.close(animate = false)
+        root.close(animate = false)
+        saveHome()
+        home.pager.snapTo(cell.page)
     }
 
     /** [cell] is where the app sits on home (inside the folder there when [inFolder]), or null in the drawer. */
@@ -363,6 +532,19 @@ class LauncherActivity : Activity() {
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
+        when (requestCode) {
+            REQ_PICK_WIDGET -> {
+                if (resultCode != RESULT_OK || data == null) return
+                @Suppress("DEPRECATION")
+                val provider = data.getParcelableExtra<ComponentName>(WidgetPickerActivity.EXTRA_PROVIDER) ?: return
+                @Suppress("DEPRECATION")
+                val profile = data.getParcelableExtra<UserHandle>(WidgetPickerActivity.EXTRA_PROFILE) ?: android.os.Process.myUserHandle()
+                return addWidget(provider, profile)
+            }
+            REQ_BIND_WIDGET -> return if (resultCode == RESULT_OK) configureOrPlace(pendingWidgetId) else dropPending(pendingWidgetId)
+            REQ_CONFIGURE_WIDGET -> return if (resultCode == RESULT_OK) placeWidget(pendingWidgetId) else dropPending(pendingWidgetId)
+            REQ_RECONFIGURE -> return
+        }
         if (requestCode != REQ_ICON_IMAGE) return
         val key = pendingIconKey ?: return
         pendingIconKey = null
@@ -397,13 +579,26 @@ class LauncherActivity : Activity() {
         }
     }
 
-    private companion object {
-        const val REQ_ICON_IMAGE = 1
-        const val STATE_ICON_KEY = "icon_key"
-        const val MENU_ICON = 1
-        const val MENU_INFO = 2
-        const val MENU_UNINSTALL = 3
-        const val MENU_ADD = 4
-        const val MENU_REMOVE = 5
+    companion object {
+        /** From [PinConfirmActivity]: place an accepted, already-bound widget. */
+        const val ACTION_PLACE_WIDGET = "com.luqman.decko.action.PLACE_WIDGET"
+
+        private const val REQ_ICON_IMAGE = 1
+        private const val REQ_PICK_WIDGET = 2
+        private const val REQ_BIND_WIDGET = 3
+        private const val REQ_CONFIGURE_WIDGET = 4
+        private const val REQ_RECONFIGURE = 5
+        private const val STATE_ICON_KEY = "icon_key"
+        private const val STATE_WIDGET_ID = "widget_id"
+        private const val MENU_WIDGETS = 10
+        private const val MENU_WALLPAPER = 11
+        private const val MENU_SETTINGS = 12
+        private const val MENU_RESIZE = 13
+        private const val MENU_WIDGET_SETTINGS = 14
+        private const val MENU_ICON = 1
+        private const val MENU_INFO = 2
+        private const val MENU_UNINSTALL = 3
+        private const val MENU_ADD = 4
+        private const val MENU_REMOVE = 5
     }
 }

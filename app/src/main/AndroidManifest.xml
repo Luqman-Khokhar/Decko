@@ -89,6 +89,24 @@
         </activity>
 
         <activity
+            android:name=".WidgetPickerActivity"
+            android:exported="false"
+            android:label="@string/widgets_title"
+            android:theme="@style/Theme.Decko.Sheet" />
+
+        <!-- Receives "add widget to home screen" requests (requestPinAppWidget) while Decko Home is the default launcher. -->
+        <activity
+            android:name=".PinConfirmActivity"
+            android:excludeFromRecents="true"
+            android:exported="true"
+            android:taskAffinity=""
+            android:theme="@style/Theme.Decko.Translucent">
+            <intent-filter>
+                <action android:name="android.content.pm.action.CONFIRM_PIN_APPWIDGET" />
+            </intent-filter>
+        </activity>
+
+        <activity
             android:name=".HomeSettingsActivity"
             android:exported="false"
             android:theme="@style/Theme.BigClock.Config" />

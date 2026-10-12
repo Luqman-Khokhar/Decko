@@ -185,5 +185,20 @@
     <string name="glass_light">Light</string>
     <string name="glass_dark">Dark</string>
     <string name="glass_backdrop_hint">For true frosted glass, set your wallpaper from Decko\'s Wallpapers tab. Other wallpapers get a tinted frost.</string>
+    <string name="widgets_title">Widgets</string>
+    <string name="widgets_loading">Loading widgets</string>
+    <string name="widgets_empty">No widgets are installed on this phone.</string>
+    <string name="widgets_error">Could not load the list of widgets.</string>
+    <string name="widget_size">%1$d × %2$d</string>
+    <string name="widget_row_description">%1$s, %2$s</string>
+    <string name="widget_error">Couldn\'t load widget</string>
+    <string name="add_widget_title">Add to home screen?</string>
+    <string name="add_widget_confirm">Add</string>
+    <string name="menu_widgets">Widgets</string>
+    <string name="menu_wallpaper">Wallpaper</string>
+    <string name="menu_home_settings">Home settings</string>
+    <string name="resize">Resize</string>
+    <string name="widget_settings">Widget settings</string>
+    <string name="resize_done">Done resizing</string>
     <string name="drop_to_remove">✕  Drop here to remove</string>
 </resources>
