@@ -174,6 +174,7 @@ class LauncherActivity : Activity() {
 
         style.dress(this, root)
         root.springs = style.springs
+        root.homeUnderDrawer = { p -> style.homeUnder(this, HomeStyle.UNDER_DRAWER, p) }
         var lastProgress = 0f
         root.onProgress = { p ->
             if (lastProgress == 0f && p > 0f) library?.reveal() ?: style.revealDrawer(grid)
@@ -186,7 +187,7 @@ class LauncherActivity : Activity() {
                 home.bind()
             }
         }
-        root.drawerCanScrollUp = { grid.canScrollVertically(-1) }
+        root.drawerCanScrollUp = { library?.canScrollUp() ?: grid.canScrollVertically(-1) }
         root.blocked = { panels?.isOpen == true || folder.isOpen || resizeFrame != null }
         root.onDrawerStateChanged = ::onDrawerStateChanged
         findViewById<View>(R.id.open_drawer).setOnClickListener {

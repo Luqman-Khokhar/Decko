@@ -16,8 +16,10 @@
     <color name="icon_bg">#FF23303B</color>
 
     <!-- Glass Home, light; dark values live in values-night. -->
-    <color name="glass_tint">#73FFFFFF</color>
-    <color name="glass_tint_solid">#C2F7F7F9</color>
+    <color name="glass_tint">#59FFFFFF</color>
+    <color name="glass_tint_solid">#61F2F2F5</color>
+    <!-- Text-bearing sheets: dense enough for dark text (4.5:1) even over a black wallpaper. -->
+    <color name="glass_sheet">#B8EDEDF0</color>
     <color name="glass_sheen">#59FFFFFF</color>
     <color name="glass_edge_hi">#E6FFFFFF</color>
     <color name="glass_edge_lo">#40FFFFFF</color>

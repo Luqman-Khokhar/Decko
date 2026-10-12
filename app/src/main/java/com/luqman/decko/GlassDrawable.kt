@@ -28,11 +28,13 @@ class GlassDrawable(
     private val topOnly: Boolean = false,
     /** False for panes that move with scrolling content, where an aligned backdrop would lag; they use the frosted look. */
     private val sampleBackdrop: Boolean = true,
+    /** Sheets carry text over whatever is behind, so their tint is denser than an accent pane's. */
+    private val sheet: Boolean = false,
 ) : Drawable() {
     private val density = context.resources.displayMetrics.density
     private val radius = cornerDp * density
     private val tint = context.getColor(R.color.glass_tint)
-    private val tintSolid = context.getColor(R.color.glass_tint_solid)
+    private val tintSolid = context.getColor(if (sheet) R.color.glass_sheet else R.color.glass_tint_solid)
     private val danger = context.getColor(R.color.glass_danger)
     private val sheen = context.getColor(R.color.glass_sheen)
     private val edgeHi = context.getColor(R.color.glass_edge_hi)
@@ -89,7 +91,7 @@ class GlassDrawable(
             matrix.setScale(s, s)
             matrix.postTranslate(-pos[0].toFloat(), -pos[1].toFloat())
             canvas.drawBitmap(backdrop, matrix, backdropPaint)
-            fill.color = if (activated) danger else tint
+            fill.color = if (activated) danger else if (sheet) tintSolid else tint
         } else {
             val colors = GlassBackdrop.colors
             if (colors != null) {

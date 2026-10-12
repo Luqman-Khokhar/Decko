@@ -108,6 +108,9 @@ class AppLibrary(
         return true
     }
 
+    /** True while whichever view is up (cards or A–Z list) can still scroll toward its top. */
+    fun canScrollUp(): Boolean = if (searchMode) list.canScrollVertically(-1) else scroll.canScrollVertically(-1)
+
     /** Drawer closed: next time it opens on the cards, scrolled to the top. */
     fun reset() {
         exitSearch()

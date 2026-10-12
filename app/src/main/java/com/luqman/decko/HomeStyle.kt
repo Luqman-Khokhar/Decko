@@ -47,7 +47,17 @@ interface HomeStyle {
 
     fun pressFeedback(view: View) {}
 
+    /**
+     * Something glass is [amount] (0..1) over home: the drawer, a folder or a panel ([source]). Returns true
+     * when the style handled home itself (blurred it in place) rather than leaving it to fade out.
+     */
+    fun homeUnder(activity: Activity, source: Int, amount: Float): Boolean = false
+
     companion object {
+        const val UNDER_DRAWER = 0
+        const val UNDER_FOLDER = 1
+        const val UNDER_PANEL = 2
+
         fun of(ctx: Context): HomeStyle = if (Prefs.homeStyle(ctx) == Prefs.STYLE_GLASS) GlassStyle else ClassicStyle
     }
 }
@@ -64,6 +74,8 @@ object GlassStyle : HomeStyle {
     private val EMPHASIZED = PathInterpolator(0.05f, 0.7f, 0.1f, 1f)
     private var blurOn = false
     private var overPanel = false
+    private val under = FloatArray(3)
+    private const val HOME_BLUR_DP = 28f
 
     override val springs get() = true
 
@@ -71,20 +83,23 @@ object GlassStyle : HomeStyle {
         // One style object outlives activity rebuilds; a new window starts unblurred, over the wallpaper.
         blurOn = false
         overPanel = false
+        under.fill(0f)
+        // Home stays visible behind the drawer now, so the drawer must take the touches over it.
+        root.findViewById<View>(R.id.drawer).isClickable = true
         val text = activity.getColor(R.color.glass_text)
         val muted = activity.getColor(R.color.glass_text_muted)
-        root.findViewById<View>(R.id.drawer).background = GlassDrawable(activity, 32f, topOnly = true)
+        root.findViewById<View>(R.id.drawer).background = GlassDrawable(activity, 32f, topOnly = true, sheet = true)
         root.findViewById<TextView>(R.id.search).apply {
-            background = GlassDrawable(activity, 24f)
+            background = GlassDrawable(activity, 24f, sheet = true)
             setTextColor(text)
             setHintTextColor(muted)
         }
         root.findViewById<TextView>(R.id.remove_bar).apply {
-            background = GlassDrawable(activity, 24f)
+            background = GlassDrawable(activity, 24f, sheet = true)
             setTextColor(text)
         }
         root.findViewById<View>(R.id.folder_overlay).setBackgroundColor(activity.getColor(R.color.glass_scrim))
-        root.findViewById<View>(R.id.folder_card).background = GlassDrawable(activity, 32f)
+        root.findViewById<View>(R.id.folder_card).background = GlassDrawable(activity, 32f, sheet = true)
         root.findViewById<TextView>(R.id.folder_name).apply {
             setTextColor(text)
             setHintTextColor(muted)
@@ -93,7 +108,7 @@ object GlassStyle : HomeStyle {
         // Home: a glass search capsule replaces the "Apps" hint, and the page dots sit in a glass pill.
         root.findViewById<TextView>(R.id.open_drawer).apply {
             setText(R.string.search_capsule)
-            background = GlassDrawable(activity, 22f)
+            background = GlassDrawable(activity, 22f, sheet = true)
             setTextColor(text)
             setShadowLayer(0f, 0f, 0f, 0)
             val icon = activity.getDrawable(R.drawable.ic_search)?.mutate()?.apply { setTint(text) }
@@ -184,6 +199,29 @@ object GlassStyle : HomeStyle {
     override fun onFolderProgress(activity: Activity, card: View, progress: Float) {
         card.background?.invalidateSelf()
         windowBlur(activity, progress > 0f)
+        homeUnder(activity, HomeStyle.UNDER_FOLDER, progress)
+    }
+
+    /**
+     * Real glass needs something behind it to blur. Apps can't blur the system wallpaper here, but they can
+     * blur their own views: home (icons, widgets) stays on screen under every glass surface, blurred and
+     * sunk back a little by whichever is most open. Android 12+; older phones keep the classic fade.
+     */
+    override fun homeUnder(activity: Activity, source: Int, amount: Float): Boolean {
+        if (Build.VERSION.SDK_INT < 31) return false
+        under[source] = amount.coerceIn(0f, 1f)
+        val home = activity.findViewById<View>(R.id.home) ?: return true
+        val a = under.max()
+        val r = HOME_BLUR_DP * activity.resources.displayMetrics.density * a
+        home.setRenderEffect(if (r < 0.5f) null else android.graphics.RenderEffect.createBlurEffect(r, r, android.graphics.Shader.TileMode.CLAMP))
+        home.alpha = 1 - 0.25f * a
+        home.scaleX = 1 - 0.05f * a
+        home.scaleY = home.scaleX
+        home.translationY = 0f
+        home.visibility = View.VISIBLE
+        // Under a fully open surface, home is scenery: TalkBack shouldn't wander into it.
+        home.importantForAccessibility = if (a >= 1f) View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS else View.IMPORTANT_FOR_ACCESSIBILITY_AUTO
+        return true
     }
 
     /**

@@ -35,7 +35,7 @@ class GlassPanels(private val activity: Activity, private val root: HomeGestureL
     }
 
     init {
-        overlay.background = GlassDrawable(activity, 0f)
+        overlay.background = GlassDrawable(activity, 0f, sheet = true)
         overlay.visibility = View.GONE
         overlay.isClickable = true
         overlay.contentDescription = activity.getString(R.string.close_panel)
@@ -109,6 +109,7 @@ class GlassPanels(private val activity: Activity, private val root: HomeGestureL
             alpha = ((shown - 0.15f) / 0.85f).coerceIn(0f, 1f)
         }
         GlassStyle.blurBehind(activity, progress > 0f)
+        GlassStyle.homeUnder(activity, HomeStyle.UNDER_PANEL, progress)
         GlassStyle.coverBars(activity, progress > 0.4f)
     }
 
