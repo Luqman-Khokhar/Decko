@@ -1,6 +1,7 @@
 package com.luqman.decko
 
 import android.content.Context
+import android.content.SharedPreferences
 
 object Prefs {
     private fun sp(ctx: Context) = ctx.applicationContext.getSharedPreferences("bigclock", Context.MODE_PRIVATE)
@@ -134,6 +135,10 @@ object Prefs {
     fun setHomeStyle(ctx: Context, style: String) {
         sp(ctx).edit().putString("home_style", style).apply()
     }
+
+    fun observe(ctx: Context, l: SharedPreferences.OnSharedPreferenceChangeListener) = sp(ctx).registerOnSharedPreferenceChangeListener(l)
+
+    fun unobserve(ctx: Context, l: SharedPreferences.OnSharedPreferenceChangeListener) = sp(ctx).unregisterOnSharedPreferenceChangeListener(l)
 
     /** Glass light/dark: [MODE_AUTO] follows the system. */
     fun glassMode(ctx: Context): Int = sp(ctx).getInt("glass_mode", MODE_AUTO)

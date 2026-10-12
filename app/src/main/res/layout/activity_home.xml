@@ -133,6 +133,36 @@
                     android:text="@string/glass_backdrop_hint"
                     android:textColor="@color/config_text_muted"
                     android:textSize="14sp" />
+
+                <LinearLayout
+                    android:id="@+id/glass_shade"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    android:background="?android:attr/selectableItemBackground"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:minHeight="48dp"
+                    android:orientation="vertical"
+                    android:paddingTop="8dp"
+                    android:paddingBottom="8dp">
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:fontFamily="sans-serif-medium"
+                        android:text="@string/shade_setting_title"
+                        android:textColor="@color/config_text"
+                        android:textSize="16sp" />
+
+                    <TextView
+                        android:id="@+id/glass_shade_state"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
+                        android:textColor="@color/config_text_muted"
+                        android:textSize="14sp" />
+                </LinearLayout>
             </LinearLayout>
 
             <TextView

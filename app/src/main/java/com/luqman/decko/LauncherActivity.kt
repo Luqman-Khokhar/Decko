@@ -148,7 +148,11 @@ class LauncherActivity : Activity() {
             )
             grid.visibility = View.GONE
             search.setOnFocusChangeListener { _, focused -> if (focused) library?.searchMode = true }
-            panels = GlassPanels(this, root).also { root.pullDown = it }
+            panels = GlassPanels(this, root, onProgress = { p ->
+                GlassStyle.blurBehind(this, p > 0f)
+                GlassStyle.homeUnder(this, HomeStyle.UNDER_PANEL, p)
+                GlassStyle.coverBars(this, p > 0.4f)
+            }).also { root.pullDown = it }
         } else {
             root.pullDown = object : HomeGestureLayout.PullDown {
                 override fun begin(x: Float, width: Int): Boolean {

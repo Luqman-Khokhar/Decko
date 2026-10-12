@@ -1,6 +1,8 @@
 package com.luqman.decko
 
+import android.content.Context
 import android.app.Activity
+import android.app.AlertDialog
 import android.app.NotificationManager
 import android.content.ActivityNotFoundException
 import android.content.Intent
@@ -19,6 +21,7 @@ import android.provider.MediaStore
 import android.provider.Settings
 import android.view.Gravity
 import android.view.View
+import android.view.WindowManager
 import android.widget.GridLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
@@ -30,23 +33,23 @@ import android.widget.TextView
  * and volume sliders; then shortcuts. Android lets apps switch only some of these directly; the rest open
  * the system panel or setting for it, and the tile says which state it's in either way.
  */
-class ControlCenter(private val activity: Activity, private val onClose: () -> Unit) : GlassPanels.Panel {
-    private val density = activity.resources.displayMetrics.density
-    private val ink = activity.getColor(R.color.glass_text)
-    private val muted = activity.getColor(R.color.glass_text_muted)
-    private val accent = activity.getColor(R.color.glass_accent)
-    private val cr = activity.contentResolver
+class ControlCenter(private val context: Context, private val onClose: () -> Unit) : GlassPanels.Panel {
+    private val density = context.resources.displayMetrics.density
+    private val ink = context.getColor(R.color.glass_text)
+    private val muted = context.getColor(R.color.glass_text_muted)
+    private val accent = context.getColor(R.color.glass_accent)
+    private val cr = context.contentResolver
     private val main = Handler(Looper.getMainLooper())
-    private val camera = activity.getSystemService(CameraManager::class.java)
-    private val audio = activity.getSystemService(AudioManager::class.java)
-    private val notifications = activity.getSystemService(NotificationManager::class.java)
+    private val camera = context.getSystemService(CameraManager::class.java)
+    private val audio = context.getSystemService(AudioManager::class.java)
+    private val notifications = context.getSystemService(NotificationManager::class.java)
     private val torchId: String? = runCatching {
         camera.cameraIdList.firstOrNull { camera.getCameraCharacteristics(it).get(CameraCharacteristics.FLASH_INFO_AVAILABLE) == true }
     }.getOrNull()
     private var torchOn = false
     private val tiles = ArrayList<Tile>()
-    private val scroll = ScrollView(activity).apply { isVerticalScrollBarEnabled = false }
-    private val media = MediaCard(activity)
+    private val scroll = ScrollView(context).apply { isVerticalScrollBarEnabled = false }
+    private val media = MediaCard(context)
     private lateinit var brightness: GlassSlider
     private lateinit var volume: GlassSlider
 
@@ -63,19 +66,19 @@ class ControlCenter(private val activity: Activity, private val onClose: () -> U
 
     /** A tile reads its state fresh each time the panel shows or after it's tapped. */
     private inner class Tile(val icon: Int, val label: Int, val isOn: () -> Boolean?, val onTap: () -> Unit) {
-        val bubble = ImageView(activity).apply { setImageResource(icon); importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO }
-        val state = TextView(activity).apply { textSize = 12f; setTextColor(muted) }
-        val root: View = LinearLayout(activity).apply {
+        val bubble = ImageView(context).apply { setImageResource(icon); importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO }
+        val state = TextView(context).apply { textSize = 12f; setTextColor(muted) }
+        val root: View = LinearLayout(context).apply {
             gravity = Gravity.CENTER_VERTICAL
-            background = GlassDrawable(activity, 24f, sampleBackdrop = false)
+            background = GlassDrawable(context, 24f, sampleBackdrop = false)
             setPadding(dp(12), dp(12), dp(12), dp(12))
             isClickable = true
             isFocusable = true
-            foreground = activity.obtainStyledAttributes(intArrayOf(android.R.attr.selectableItemBackground)).run { getDrawable(0).also { recycle() } }
+            foreground = context.obtainStyledAttributes(intArrayOf(android.R.attr.selectableItemBackground)).run { getDrawable(0).also { recycle() } }
             addView(bubble, LinearLayout.LayoutParams(dp(42), dp(42)))
-            addView(LinearLayout(activity).apply {
+            addView(LinearLayout(context).apply {
                 orientation = LinearLayout.VERTICAL
-                addView(TextView(activity).apply {
+                addView(TextView(context).apply {
                     setText(label)
                     textSize = 14f
                     setTextColor(ink)
@@ -99,22 +102,22 @@ class ControlCenter(private val activity: Activity, private val onClose: () -> U
                 shape = GradientDrawable.OVAL
                 setColor(if (on == true) accent else (muted and 0x00FFFFFF) or 0x33000000)
             }
-            bubble.setColorFilter(if (on == true) activity.getColor(R.color.controls_text) else ink)
+            bubble.setColorFilter(if (on == true) context.getColor(R.color.controls_text) else ink)
             // Color is never the only signal: the state is spelled out too.
             state.setText(when (on) { true -> R.string.state_on; false -> R.string.state_off; null -> R.string.state_open })
-            root.contentDescription = activity.getString(label) + ", " + state.text
+            root.contentDescription = context.getString(label) + ", " + state.text
         }
     }
 
     init {
-        val content = LinearLayout(activity).apply {
+        val content = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(20), dp(16), dp(20), dp(32))
             setOnClickListener { onClose() }
             importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
         }
         scroll.addView(content)
-        content.addView(TextView(activity).apply {
+        content.addView(TextView(context).apply {
             setText(R.string.control_center)
             textSize = 15f
             setTextColor(muted)
@@ -128,34 +131,34 @@ class ControlCenter(private val activity: Activity, private val onClose: () -> U
         tiles += Tile(R.drawable.ic_cc_moon, R.string.cc_dnd, { notifications.currentInterruptionFilter > NotificationManager.INTERRUPTION_FILTER_ALL }, ::toggleDnd)
         if (torchId != null) tiles += Tile(R.drawable.ic_cc_flashlight, R.string.cc_flashlight, { torchOn }, ::toggleTorch)
         tiles += Tile(R.drawable.ic_cc_rotate, R.string.cc_rotate, { Settings.System.getInt(cr, Settings.System.ACCELEROMETER_ROTATION, 0) == 1 }, ::toggleRotate)
-        val grid = GridLayout(activity).apply { columnCount = 2 }
+        val grid = GridLayout(context).apply { columnCount = 2 }
         for (t in tiles) grid.addView(t.root, GridLayout.LayoutParams(GridLayout.spec(GridLayout.UNDEFINED), GridLayout.spec(GridLayout.UNDEFINED, 1f)).apply {
             width = 0
             setMargins(dp(4), dp(4), dp(4), dp(4))
         })
         content.addView(grid)
 
-        brightness = GlassSlider(activity, activity.getDrawable(R.drawable.ic_cc_sun)?.mutate(), activity.getString(R.string.cc_brightness)).apply {
+        brightness = GlassSlider(context, context.getDrawable(R.drawable.ic_cc_sun)?.mutate(), context.getString(R.string.cc_brightness)).apply {
             canChange = {
-                Settings.System.canWrite(activity).also { if (!it) openPanel(Settings.ACTION_MANAGE_WRITE_SETTINGS, withPackage = true) }
+                Settings.System.canWrite(context).also { if (!it) askWriteSettings() }
             }
             onChange = { v ->
                 Settings.System.putInt(cr, Settings.System.SCREEN_BRIGHTNESS_MODE, Settings.System.SCREEN_BRIGHTNESS_MODE_MANUAL)
                 Settings.System.putInt(cr, Settings.System.SCREEN_BRIGHTNESS, (MIN_BRIGHTNESS + v * (MAX_BRIGHTNESS - MIN_BRIGHTNESS)).toInt())
             }
         }
-        volume = GlassSlider(activity, activity.getDrawable(R.drawable.ic_cc_volume)?.mutate(), activity.getString(R.string.cc_volume)).apply {
+        volume = GlassSlider(context, context.getDrawable(R.drawable.ic_cc_volume)?.mutate(), context.getString(R.string.cc_volume)).apply {
             onChange = { v ->
                 val max = audio.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
                 runCatching { audio.setStreamVolume(AudioManager.STREAM_MUSIC, Math.round(v * max), 0) }
             }
         }
-        content.addView(LinearLayout(activity).apply {
+        content.addView(LinearLayout(context).apply {
             addView(brightness, LinearLayout.LayoutParams(0, dp(SLIDER_DP), 1f).apply { marginStart = dp(4); marginEnd = dp(8) })
             addView(volume, LinearLayout.LayoutParams(0, dp(SLIDER_DP), 1f).apply { marginStart = dp(8); marginEnd = dp(4) })
         }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(12) })
 
-        val shortcuts = LinearLayout(activity).apply { gravity = Gravity.CENTER }
+        val shortcuts = LinearLayout(context).apply { gravity = Gravity.CENTER }
         shortcut(shortcuts, R.drawable.ic_cc_camera, R.string.cc_camera) { Intent(MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA) }
         shortcut(shortcuts, R.drawable.ic_cc_calculator, R.string.cc_calculator) { Intent.makeMainSelectorActivity(Intent.ACTION_MAIN, Intent.CATEGORY_APP_CALCULATOR) }
         shortcut(shortcuts, R.drawable.ic_cc_clock, R.string.cc_alarms) { Intent(AlarmClock.ACTION_SHOW_ALARMS) }
@@ -184,7 +187,7 @@ class ControlCenter(private val activity: Activity, private val onClose: () -> U
         volume.value = audio.getStreamVolume(AudioManager.STREAM_MUSIC) / max.toFloat()
     }
 
-    private fun wifiOn(): Boolean? = runCatching { activity.applicationContext.getSystemService(WifiManager::class.java).isWifiEnabled }.getOrNull()
+    private fun wifiOn(): Boolean? = runCatching { context.applicationContext.getSystemService(WifiManager::class.java).isWifiEnabled }.getOrNull()
 
     private fun toggleTorch() {
         val id = torchId ?: return
@@ -199,38 +202,54 @@ class ControlCenter(private val activity: Activity, private val onClose: () -> U
     }
 
     private fun toggleRotate() {
-        if (!Settings.System.canWrite(activity)) return openPanel(Settings.ACTION_MANAGE_WRITE_SETTINGS, withPackage = true)
+        if (!Settings.System.canWrite(context)) return askWriteSettings()
         val on = Settings.System.getInt(cr, Settings.System.ACCELEROMETER_ROTATION, 0) == 1
         Settings.System.putInt(cr, Settings.System.ACCELEROMETER_ROTATION, if (on) 0 else 1)
     }
 
+    /** Explains "Modify system settings" before sending the user to Decko's switch for it. */
+    private fun askWriteSettings() {
+        AlertDialog.Builder(context)
+            .setTitle(R.string.cc_write_settings_title)
+            .setMessage(R.string.cc_write_settings_body)
+            .setPositiveButton(R.string.cc_write_settings_allow) { _, _ -> openPanel(Settings.ACTION_MANAGE_WRITE_SETTINGS, withPackage = true) }
+            .setNegativeButton(android.R.string.cancel, null)
+            .create()
+            .apply {
+                // Over other apps there's no activity window to attach to; the shade's accessibility window type works.
+                if (context !is Activity) window?.setType(WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY)
+            }
+            .show()
+    }
+
     /** Leaves the panel for a system screen; [withPackage] points it at Decko (e.g. "Modify system settings"). */
     private fun openPanel(action: String, withPackage: Boolean = false) {
-        val intent = Intent(action).apply { if (withPackage) data = Uri.parse("package:" + activity.packageName) }
+        // New task: over other apps the panels live in a service's window, not an activity.
+        val intent = Intent(action).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK).apply { if (withPackage) data = Uri.parse("package:" + context.packageName) }
         onClose()
         try {
-            activity.startActivity(intent)
+            context.startActivity(intent)
         } catch (e: ActivityNotFoundException) {
-            activity.startActivity(Intent(Settings.ACTION_SETTINGS))
+            context.startActivity(Intent(Settings.ACTION_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
         }
     }
 
     private fun shortcut(row: LinearLayout, icon: Int, label: Int, intent: () -> Intent) {
         val size = dp(60)
-        row.addView(ImageView(activity).apply {
+        row.addView(ImageView(context).apply {
             setImageResource(icon)
             setColorFilter(ink)
             val p = dp(17)
             setPadding(p, p, p, p)
-            background = GlassDrawable(activity, 30f, sampleBackdrop = false)
-            foreground = activity.obtainStyledAttributes(intArrayOf(android.R.attr.selectableItemBackgroundBorderless)).run { getDrawable(0).also { recycle() } }
-            contentDescription = activity.getString(label)
+            background = GlassDrawable(context, 30f, sampleBackdrop = false)
+            foreground = context.obtainStyledAttributes(intArrayOf(android.R.attr.selectableItemBackgroundBorderless)).run { getDrawable(0).also { recycle() } }
+            contentDescription = context.getString(label)
             isClickable = true
             isFocusable = true
             GlassStyle.pressFeedback(this)
             setOnClickListener {
                 onClose()
-                runCatching { activity.startActivity(intent().addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+                runCatching { context.startActivity(intent().addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
             }
         }, LinearLayout.LayoutParams(size, size).apply { marginStart = dp(8); marginEnd = dp(8) })
     }

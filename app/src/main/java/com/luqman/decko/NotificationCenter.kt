@@ -1,7 +1,7 @@
 package com.luqman.decko
 
 import android.annotation.SuppressLint
-import android.app.Activity
+import android.content.Context
 import android.app.ActivityOptions
 import android.app.Notification
 import android.graphics.Typeface
@@ -26,12 +26,12 @@ import kotlin.math.abs
  * cards. Tap opens, swipe sideways dismisses, Clear all clears what can be cleared. Until the user allows
  * notification access, a card explains and asks.
  */
-class NotificationCenter(private val activity: Activity, private val onClose: () -> Unit) : GlassPanels.Panel {
-    private val density = activity.resources.displayMetrics.density
-    private val ink = activity.getColor(R.color.glass_text)
-    private val muted = activity.getColor(R.color.glass_text_muted)
-    private val scroll = ScrollView(activity).apply { isVerticalScrollBarEnabled = false; clipToPadding = false }
-    private val content = LinearLayout(activity).apply {
+class NotificationCenter(private val context: Context, private val onClose: () -> Unit) : GlassPanels.Panel {
+    private val density = context.resources.displayMetrics.density
+    private val ink = context.getColor(R.color.glass_text)
+    private val muted = context.getColor(R.color.glass_text_muted)
+    private val scroll = ScrollView(context).apply { isVerticalScrollBarEnabled = false; clipToPadding = false }
+    private val content = LinearLayout(context).apply {
         orientation = LinearLayout.VERTICAL
         val p = dp(20)
         setPadding(p, dp(12), p, dp(32))
@@ -39,22 +39,22 @@ class NotificationCenter(private val activity: Activity, private val onClose: ()
         setOnClickListener { onClose() }
         importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
     }
-    private val list = LinearLayout(activity).apply { orientation = LinearLayout.VERTICAL }
-    private val media = MediaCard(activity)
+    private val list = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
+    private val media = MediaCard(context)
     private val changed: () -> Unit = ::rebuild
 
     override val view: View = scroll
 
     init {
         scroll.addView(content)
-        content.addView(TextClock(activity).apply {
+        content.addView(TextClock(context).apply {
             format12Hour = "h:mm"
             format24Hour = "H:mm"
             textSize = 64f
             setTextColor(ink)
             typeface = Typeface.create("sans-serif-light", Typeface.NORMAL)
         })
-        content.addView(TextClock(activity).apply {
+        content.addView(TextClock(context).apply {
             format12Hour = "EEEE, MMMM d"
             format24Hour = "EEEE, d MMMM"
             textSize = 17f
@@ -82,19 +82,19 @@ class NotificationCenter(private val activity: Activity, private val onClose: ()
 
     private fun rebuild() {
         list.removeAllViews()
-        if (!NotificationHub.isGranted(activity)) {
+        if (!NotificationHub.isGranted(context)) {
             list.addView(accessCard())
             return
         }
         val items = NotificationHub.items
-        val header = LinearLayout(activity).apply { gravity = Gravity.CENTER_VERTICAL }
-        header.addView(label(activity.getString(R.string.notifications_title), 15f, muted, bold = true), LinearLayout.LayoutParams(0, -2, 1f))
+        val header = LinearLayout(context).apply { gravity = Gravity.CENTER_VERTICAL }
+        header.addView(label(context.getString(R.string.notifications_title), 15f, muted, bold = true), LinearLayout.LayoutParams(0, -2, 1f))
         if (items.any { it.isClearable }) {
-            header.addView(pill(activity.getString(R.string.clear_all)) { NotificationHub.dismissAll() })
+            header.addView(pill(context.getString(R.string.clear_all)) { NotificationHub.dismissAll() })
         }
         list.addView(header, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(8) })
         if (items.isEmpty()) {
-            list.addView(label(activity.getString(R.string.no_notifications), 16f, muted).apply {
+            list.addView(label(context.getString(R.string.no_notifications), 16f, muted).apply {
                 gravity = Gravity.CENTER
                 setPadding(0, dp(40), 0, dp(40))
             }, LinearLayout.LayoutParams(-1, -2))
@@ -106,59 +106,59 @@ class NotificationCenter(private val activity: Activity, private val onClose: ()
     private fun cardParams() = LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(10) }
 
     /** Before access: what the panel does and the button that leads to Android's permission screen. */
-    private fun accessCard(): View = LinearLayout(activity).apply {
+    private fun accessCard(): View = LinearLayout(context).apply {
         orientation = LinearLayout.VERTICAL
-        background = GlassDrawable(activity, 26f, sampleBackdrop = false)
+        background = GlassDrawable(context, 26f, sampleBackdrop = false)
         setPadding(dp(18), dp(18), dp(18), dp(18))
         isClickable = true
-        addView(ImageView(activity).apply {
+        addView(ImageView(context).apply {
             setImageResource(R.drawable.ic_cc_bell)
             setColorFilter(ink)
             importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
         }, LinearLayout.LayoutParams(dp(28), dp(28)))
-        addView(label(activity.getString(R.string.notifications_access_title), 18f, ink, bold = true), LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(10) })
-        addView(label(activity.getString(R.string.notifications_access_body), 15f, muted), LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(4) })
-        addView(Button(activity).apply {
+        addView(label(context.getString(R.string.notifications_access_title), 18f, ink, bold = true), LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(10) })
+        addView(label(context.getString(R.string.notifications_access_body), 15f, muted), LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(4) })
+        addView(Button(context).apply {
             setText(R.string.notifications_access_button)
             isAllCaps = false
             textSize = 15f
-            setTextColor(activity.getColor(R.color.controls_text))
+            setTextColor(context.getColor(R.color.controls_text))
             typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
             background = android.graphics.drawable.GradientDrawable().apply {
                 cornerRadius = dp(22).toFloat()
-                setColor(activity.getColor(R.color.glass_accent))
+                setColor(context.getColor(R.color.glass_accent))
             }
-            foreground = activity.obtainStyledAttributes(intArrayOf(android.R.attr.selectableItemBackground)).run { getDrawable(0).also { recycle() } }
+            foreground = context.obtainStyledAttributes(intArrayOf(android.R.attr.selectableItemBackground)).run { getDrawable(0).also { recycle() } }
             setPadding(dp(24), 0, dp(24), 0)
             stateListAnimator = null
             setOnClickListener {
                 onClose()
-                NotificationHub.requestAccess(activity)
+                NotificationHub.requestAccess(context)
             }
         }, LinearLayout.LayoutParams(-2, dp(44)).apply { topMargin = dp(14) })
     }
 
     /** One app: header with icon, name and newest time; then its notifications, newest first. */
     private fun groupCard(pkg: String, group: List<StatusBarNotification>): View {
-        val card = LinearLayout(activity).apply {
+        val card = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
-            background = GlassDrawable(activity, 24f, sampleBackdrop = false)
+            background = GlassDrawable(context, 24f, sampleBackdrop = false)
             setPadding(dp(16), dp(12), dp(16), dp(6))
         }
-        val head = LinearLayout(activity).apply { gravity = Gravity.CENTER_VERTICAL }
-        val icon = runCatching { activity.packageManager.getApplicationIcon(pkg) }.getOrNull()
-            ?: group.first().notification.smallIcon?.loadDrawable(activity)?.apply { setTint(ink) }
-        head.addView(ImageView(activity).apply {
+        val head = LinearLayout(context).apply { gravity = Gravity.CENTER_VERTICAL }
+        val icon = runCatching { context.packageManager.getApplicationIcon(pkg) }.getOrNull()
+            ?: group.first().notification.smallIcon?.loadDrawable(context)?.apply { setTint(ink) }
+        head.addView(ImageView(context).apply {
             setImageDrawable(icon)
             importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
         }, LinearLayout.LayoutParams(dp(18), dp(18)))
-        val appName = runCatching { activity.packageManager.getApplicationLabel(activity.packageManager.getApplicationInfo(pkg, 0)).toString() }.getOrDefault(pkg)
+        val appName = runCatching { context.packageManager.getApplicationLabel(context.packageManager.getApplicationInfo(pkg, 0)).toString() }.getOrDefault(pkg)
         head.addView(label(appName, 13f, muted, bold = true), LinearLayout.LayoutParams(0, -2, 1f).apply { marginStart = dp(8) })
         head.addView(label(ago(group.first().postTime), 12f, muted))
         card.addView(head, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(4) })
         for (sbn in group.take(MAX_PER_APP)) card.addView(item(sbn))
         if (group.size > MAX_PER_APP) {
-            card.addView(label(activity.getString(R.string.more_notifications, group.size - MAX_PER_APP), 13f, muted).apply { setPadding(0, dp(4), 0, dp(8)) })
+            card.addView(label(context.getString(R.string.more_notifications, group.size - MAX_PER_APP), 13f, muted).apply { setPadding(0, dp(4), 0, dp(8)) })
         }
         return card
     }
@@ -167,12 +167,12 @@ class NotificationCenter(private val activity: Activity, private val onClose: ()
         val extras = sbn.notification.extras
         val title = extras.getCharSequence(Notification.EXTRA_TITLE)?.toString().orEmpty()
         val body = (extras.getCharSequence(Notification.EXTRA_BIG_TEXT) ?: extras.getCharSequence(Notification.EXTRA_TEXT))?.toString().orEmpty()
-        val row = LinearLayout(activity).apply {
+        val row = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(0, dp(6), 0, dp(8))
             isClickable = true
             isFocusable = true
-            foreground = activity.obtainStyledAttributes(intArrayOf(android.R.attr.selectableItemBackground)).run { getDrawable(0).also { recycle() } }
+            foreground = context.obtainStyledAttributes(intArrayOf(android.R.attr.selectableItemBackground)).run { getDrawable(0).also { recycle() } }
             contentDescription = listOf(title, body).filter { it.isNotEmpty() }.joinToString(". ")
         }
         if (title.isNotEmpty()) row.addView(label(title, 15f, ink, bold = true).apply { maxLines = 1; ellipsize = TextUtils.TruncateAt.END })
@@ -188,7 +188,7 @@ class NotificationCenter(private val activity: Activity, private val onClose: ()
         val options = if (Build.VERSION.SDK_INT >= 34) {
             ActivityOptions.makeBasic().setPendingIntentBackgroundActivityStartMode(ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOWED).toBundle()
         } else null
-        runCatching { intent.send(activity, 0, null, null, null, null, options) }
+        runCatching { intent.send(context, 0, null, null, null, null, options) }
         if (sbn.notification.flags and Notification.FLAG_AUTO_CANCEL != 0) NotificationHub.dismiss(sbn)
         onClose()
     }
@@ -196,7 +196,7 @@ class NotificationCenter(private val activity: Activity, private val onClose: ()
     /** Horizontal drag past a third of the width (or a quick flick) slides it out and dismisses. */
     @SuppressLint("ClickableViewAccessibility") // Taps still go through performClick; TalkBack users use Clear all.
     private fun swipeToDismiss(v: View, onDismiss: () -> Unit) {
-        val slop = ViewConfiguration.get(activity).scaledTouchSlop
+        val slop = ViewConfiguration.get(context).scaledTouchSlop
         var downX = 0f
         var downTime = 0L
         var swiping = false
@@ -234,19 +234,19 @@ class NotificationCenter(private val activity: Activity, private val onClose: ()
 
     private fun ago(time: Long) = DateUtils.getRelativeTimeSpanString(time, System.currentTimeMillis(), DateUtils.MINUTE_IN_MILLIS, DateUtils.FORMAT_ABBREV_RELATIVE).toString()
 
-    private fun label(s: String, size: Float, color: Int, bold: Boolean = false) = TextView(activity).apply {
+    private fun label(s: String, size: Float, color: Int, bold: Boolean = false) = TextView(context).apply {
         text = s
         textSize = size
         setTextColor(color)
         if (bold) typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
     }
 
-    private fun pill(s: String, onClick: () -> Unit) = TextView(activity).apply {
+    private fun pill(s: String, onClick: () -> Unit) = TextView(context).apply {
         text = s
         textSize = 13f
         setTextColor(ink)
         typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
-        background = GlassDrawable(activity, 16f, sampleBackdrop = false)
+        background = GlassDrawable(context, 16f, sampleBackdrop = false)
         setPadding(dp(14), dp(6), dp(14), dp(6))
         isClickable = true
         isFocusable = true

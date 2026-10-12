@@ -1,9 +1,11 @@
 package com.luqman.decko
 
 import android.app.Activity
+import android.app.AlertDialog
 import android.content.Intent
 import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
+import android.provider.Settings
 import android.view.Gravity
 import android.view.View
 import android.widget.Button
@@ -43,6 +45,7 @@ class HomeSettingsActivity : Activity() {
             }
         }
         buildStyles()
+        findViewById<View>(R.id.glass_shade).setOnClickListener { askShade() }
         findViewById<Button>(R.id.set_default).setOnClickListener {
             if (roleRefused) HomeSetup.openSettings(this) else HomeSetup.request(this, REQ_HOME_ROLE)
         }
@@ -77,6 +80,10 @@ class HomeSettingsActivity : Activity() {
     }
 
     private fun refresh() {
+        // Re-read on resume: the user may be back from turning it on in Accessibility.
+        findViewById<TextView>(R.id.glass_shade_state).setText(
+            if (GlassShadeService.isEnabled(this)) R.string.shade_setting_on else R.string.shade_setting_off,
+        )
         val isDefault = HomeSetup.isDefaultHome(this)
         findViewById<TextView>(R.id.home_status).setText(if (isDefault) R.string.home_is_default else R.string.home_not_default)
         findViewById<Button>(R.id.set_default).apply {
@@ -127,6 +134,7 @@ class HomeSettingsActivity : Activity() {
                 setOnClickListener {
                     Prefs.setHomeStyle(this@HomeSettingsActivity, id)
                     buildStyles()
+                    if (id == Prefs.STYLE_GLASS && !chosen && !GlassShadeService.isEnabled(this@HomeSettingsActivity)) askShade()
                 }
             }
             container.addView(card, LinearLayout.LayoutParams(0, -1, 1f).apply {
@@ -136,6 +144,20 @@ class HomeSettingsActivity : Activity() {
         val glass = current == Prefs.STYLE_GLASS
         findViewById<View>(R.id.glass_options).visibility = if (glass) View.VISIBLE else View.GONE
         findViewById<View>(R.id.glass_backdrop_hint).visibility = if (glass && !GlassBackdrop.hasSource(this)) View.VISIBLE else View.GONE
+    }
+
+    /** On: shows it's working. Off: explains Accessibility (and Android 13's restricted-settings step) before going there. */
+    private fun askShade() {
+        if (GlassShadeService.isEnabled(this)) {
+            startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+            return
+        }
+        AlertDialog.Builder(this)
+            .setTitle(R.string.shade_dialog_title)
+            .setMessage(R.string.shade_dialog_body)
+            .setPositiveButton(R.string.shade_dialog_open) { _, _ -> startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
     }
 
     /** Decko itself first, then apps spread across the alphabet, so each card previews a varied set. */

@@ -1,25 +1,34 @@
 package com.luqman.decko
 
 import android.annotation.SuppressLint
-import android.app.Activity
+import android.content.Context
 import android.view.MotionEvent
 import android.view.VelocityTracker
 import android.view.View
 import android.view.ViewConfiguration
+import android.view.ViewGroup
 import android.widget.FrameLayout
 import kotlin.math.abs
 
 /**
  * Glass's pull-down panels: pulling down on the left half of home brings the notification center, on the
  * right half the control center. A full-screen frosted pane fades in while the content drops into place
- * on a spring; pulling up, Back, Home or a tap on empty glass sends it away.
+ * on a spring; pulling up, Back, Home or a tap on empty glass sends it away. Hosted in [root]: Decko Home's
+ * own layout, or [GlassShadeService]'s overlay window over other apps.
  */
-class GlassPanels(private val activity: Activity, private val root: HomeGestureLayout) : HomeGestureLayout.PullDown {
-    private val overlay = PanelLayout(activity)
-    private val notifications = NotificationCenter(activity, ::close)
-    private val controls = ControlCenter(activity, ::close)
+class GlassPanels(
+    private val context: Context,
+    private val root: ViewGroup,
+    /** Every progress change, for the host's effects around the pane (window blur, home under it, bar icons). */
+    private val onProgress: (Float) -> Unit = {},
+    /** The pane has fully gone away. */
+    private val onHidden: () -> Unit = {},
+) : HomeGestureLayout.PullDown {
+    private val overlay = PanelLayout(context)
+    private val notifications = NotificationCenter(context, ::close)
+    private val controls = ControlCenter(context, ::close)
     private var current: Panel? = null
-    private val density = activity.resources.displayMetrics.density
+    private val density = context.resources.displayMetrics.density
     private val spring = Spring(SPRING_STIFFNESS, SPRING_DAMPING, onUpdate = ::apply, onEnd = { if (progress <= 0f) hide() })
 
     /** 0 = hidden, 1 = fully down. */
@@ -35,10 +44,10 @@ class GlassPanels(private val activity: Activity, private val root: HomeGestureL
     }
 
     init {
-        overlay.background = GlassDrawable(activity, 0f, sheet = true)
+        overlay.background = GlassDrawable(context, 0f, sheet = true)
         overlay.visibility = View.GONE
         overlay.isClickable = true
-        overlay.contentDescription = activity.getString(R.string.close_panel)
+        overlay.contentDescription = context.getString(R.string.close_panel)
         overlay.setOnClickListener { close() }
         for (p in listOf<Panel>(notifications, controls)) {
             p.view.visibility = View.GONE
@@ -78,7 +87,8 @@ class GlassPanels(private val activity: Activity, private val root: HomeGestureL
         hide()
     }
 
-    private fun pullDistance() = root.height * PULL_FRACTION
+    /** The screen height stands in until a freshly added overlay window has been laid out. */
+    private fun pullDistance() = (if (root.height > 0) root.height else context.resources.displayMetrics.heightPixels) * PULL_FRACTION
 
     private fun show(panel: Panel) {
         if (current !== panel) {
@@ -95,6 +105,7 @@ class GlassPanels(private val activity: Activity, private val root: HomeGestureL
         overlay.visibility = View.GONE
         current?.let { it.view.visibility = View.GONE; it.onHide() }
         current = null
+        onHidden()
     }
 
     /** The pane fades in; the content drops from a little above, growing slightly, and fades in a beat later. */
@@ -108,14 +119,12 @@ class GlassPanels(private val activity: Activity, private val root: HomeGestureL
             scaleY = scaleX
             alpha = ((shown - 0.15f) / 0.85f).coerceIn(0f, 1f)
         }
-        GlassStyle.blurBehind(activity, progress > 0f)
-        GlassStyle.homeUnder(activity, HomeStyle.UNDER_PANEL, progress)
-        GlassStyle.coverBars(activity, progress > 0.4f)
+        onProgress(progress)
     }
 
     /** Pulling up on an open panel (once its content is scrolled to the end) slides it away. */
-    private inner class PanelLayout(activity: Activity) : FrameLayout(activity) {
-        private val slop = ViewConfiguration.get(activity).scaledTouchSlop
+    private inner class PanelLayout(context: Context) : FrameLayout(context) {
+        private val slop = ViewConfiguration.get(context).scaledTouchSlop
         private var downX = 0f
         private var downY = 0f
         private var dragging = false

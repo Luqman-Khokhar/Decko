@@ -1,6 +1,5 @@
 package com.luqman.decko
 
-import android.app.Activity
 import android.app.Notification
 import android.content.ComponentName
 import android.content.Context
@@ -38,17 +37,18 @@ object NotificationHub {
     }
 
     /** Turns the listener on and opens Android's access screen for it. */
-    fun requestAccess(activity: Activity) {
-        activity.packageManager.setComponentEnabledSetting(
-            component(activity), PackageManager.COMPONENT_ENABLED_STATE_ENABLED, PackageManager.DONT_KILL_APP,
+    fun requestAccess(ctx: Context) {
+        ctx.packageManager.setComponentEnabledSetting(
+            component(ctx), PackageManager.COMPONENT_ENABLED_STATE_ENABLED, PackageManager.DONT_KILL_APP,
         )
         val intent = if (Build.VERSION.SDK_INT >= 30) {
             Intent(Settings.ACTION_NOTIFICATION_LISTENER_DETAIL_SETTINGS)
-                .putExtra(Settings.EXTRA_NOTIFICATION_LISTENER_COMPONENT_NAME, component(activity).flattenToString())
+                .putExtra(Settings.EXTRA_NOTIFICATION_LISTENER_COMPONENT_NAME, component(ctx).flattenToString())
         } else {
             Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
-        }
-        runCatching { activity.startActivity(intent) }.onFailure { activity.startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)) }
+        }.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        runCatching { ctx.startActivity(intent) }
+            .onFailure { ctx.startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
     }
 
     fun dismiss(sbn: StatusBarNotification) {
