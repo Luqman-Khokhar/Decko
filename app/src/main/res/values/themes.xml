@@ -19,5 +19,16 @@
         <item name="android:textColor">@color/config_text</item>
         <item name="android:textSize">15sp</item>
         <item name="android:maxLines">1</item>
+        <item name="android:autoSizeTextType">uniform</item>
+        <item name="android:autoSizeMinTextSize">11sp</item>
+        <item name="android:autoSizeMaxTextSize">15sp</item>
+    </style>
+
+    <style name="Theme.Decko.Launcher" parent="android:Theme.Material.Wallpaper.NoTitleBar">
+        <item name="android:windowShowWallpaper">true</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:colorAccent">@color/controls_text</item>
     </style>
 </resources>

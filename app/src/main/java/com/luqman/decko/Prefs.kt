@@ -100,6 +100,27 @@ object Prefs {
         return PhotoWidgetConfig(p[0], p[1] == "fit", p[2].toIntOrNull() ?: 0)
     }
 
+    /** Built-in pack Decko Home draws every app icon with. */
+    fun iconPack(ctx: Context): IconPack = IconPack.byId(sp(ctx).getString("icon_pack", null)) ?: IconPack.SYSTEM
+
+    fun setIconPack(ctx: Context, pack: IconPack) {
+        sp(ctx).edit().putString("icon_pack", pack.id).apply()
+    }
+
+    /** Per-app icon choice keyed by [AppEntry.key]: "pack:<id>" or "image:<stamp>"; null follows [iconPack]. */
+    fun iconOverride(ctx: Context, appKey: String): String? = sp(ctx).getString("icon_o_$appKey", null)
+
+    fun setIconOverride(ctx: Context, appKey: String, value: String?) {
+        sp(ctx).edit().apply { if (value == null) remove("icon_o_$appKey") else putString("icon_o_$appKey", value) }.apply()
+    }
+
+    fun iconOverrideCount(ctx: Context) = sp(ctx).all.keys.count { it.startsWith("icon_o_") }
+
+    fun clearIconOverrides(ctx: Context) {
+        val p = sp(ctx)
+        p.edit().apply { p.all.keys.filter { it.startsWith("icon_o_") }.forEach { remove(it) } }.apply()
+    }
+
     /** Status-bar overlay settings. */
     fun header(ctx: Context): HeaderConfig {
         val p = sp(ctx)

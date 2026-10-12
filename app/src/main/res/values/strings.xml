@@ -126,4 +126,43 @@
     <string name="lock_screen_manual">Open Settings → Wallpaper, choose Live wallpaper → Decko, and apply it to the lock screen.</string>
     <string name="wallpaper_description">Big analog clock on your lock screen and home screen. Uses the design chosen in the Decko app.</string>
     <string name="add_widget_manual">Long-press the home screen, tap Widgets, then drag Decko onto it.</string>
+
+    <string name="tab_home">Home</string>
+    <string name="home_title">Home screen</string>
+    <string name="home_hint">Use Decko as your home app: your clock on the wallpaper and every app drawn with one icon pack. Swipe up on it to see your apps.</string>
+    <string name="home_is_default">✓ Decko is your home app</string>
+    <string name="home_not_default">Decko is not your home app yet</string>
+    <string name="home_set_default">Set Decko as home app</string>
+    <string name="home_open">Preview Decko Home</string>
+    <string name="home_choose_in_settings">Choose home app in Settings</string>
+    <string name="icon_pack">Icon pack</string>
+    <string name="icon_pack_hint">Every app icon in Decko Home is redrawn in this style. Long-press an app there to change just that one.</string>
+    <string name="icon_reset_all">Reset custom icons</string>
+    <plurals name="icon_custom_count">
+        <item quantity="one">%1$d app has its own icon.</item>
+        <item quantity="other">%1$d apps have their own icon.</item>
+    </plurals>
+    <string name="pack_system">Original</string>
+    <string name="pack_circle">Circle</string>
+    <string name="pack_squircle">Squircle</string>
+    <string name="pack_rounded">Rounded square</string>
+    <string name="pack_teardrop">Teardrop</string>
+    <string name="pack_themed">Clock colors</string>
+    <string name="launcher_label">Decko Home</string>
+    <string name="open_drawer">︿  Apps</string>
+    <string name="drawer_title">Apps</string>
+    <string name="search_apps">Search apps</string>
+    <string name="drawer_loading">Loading apps</string>
+    <string name="drawer_no_match">No apps match “%1$s”.</string>
+    <string name="drawer_empty">No apps found.</string>
+    <string name="drawer_error">Could not load your apps.</string>
+    <string name="retry">Try again</string>
+    <string name="work_app">%1$s (work)</string>
+    <string name="launch_failed">Could not open that app.</string>
+    <string name="change_icon">Change icon</string>
+    <string name="change_icon_for">Icon for %1$s</string>
+    <string name="icon_from_image">Your picture</string>
+    <string name="icon_default">Icon pack default</string>
+    <string name="app_info">App info</string>
+    <string name="uninstall">Uninstall</string>
 </resources>
