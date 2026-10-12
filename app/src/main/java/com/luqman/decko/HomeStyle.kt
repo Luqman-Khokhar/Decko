@@ -168,12 +168,18 @@ object GlassStyle : HomeStyle {
         activity.findViewById<View>(R.id.search).background?.invalidateSelf()
         windowBlur(activity, progress > 0f)
         // The drawer covers the status bar once mostly open.
-        val covered = progress > 0.5f
-        if (covered != overPanel) {
-            overPanel = covered
-            applyBars(activity)
-        }
+        coverBars(activity, progress > 0.5f)
     }
+
+    /** A glass panel now covers the status bar (or no longer does): bar icons follow the glass, not the wallpaper. */
+    fun coverBars(activity: Activity, covered: Boolean) {
+        if (covered == overPanel) return
+        overPanel = covered
+        applyBars(activity)
+    }
+
+    /** Real blur behind the window while a glass panel is up, where the phone supports it. */
+    fun blurBehind(activity: Activity, on: Boolean) = windowBlur(activity, on)
 
     override fun onFolderProgress(activity: Activity, card: View, progress: Float) {
         card.background?.invalidateSelf()

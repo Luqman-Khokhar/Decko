@@ -56,6 +56,9 @@ class LauncherActivity : Activity() {
 
     /** Glass's App Library, in place of the classic grid; null in Classic. */
     private var library: AppLibrary? = null
+
+    /** Glass's pull-down notification and control centers; null in Classic, which pulls down the system shade. */
+    private var panels: GlassPanels? = null
     private lateinit var search: EditText
     private lateinit var grid: GridView
     private lateinit var state: View
@@ -144,6 +147,16 @@ class LauncherActivity : Activity() {
             )
             grid.visibility = View.GONE
             search.setOnFocusChangeListener { _, focused -> if (focused) library?.searchMode = true }
+            panels = GlassPanels(this, root).also { root.pullDown = it }
+        } else {
+            root.pullDown = object : HomeGestureLayout.PullDown {
+                override fun begin(x: Float, width: Int): Boolean {
+                    expandSystemShade()
+                    return false
+                }
+                override fun drag(distance: Float) = Unit
+                override fun release(velocity: Float, cancelled: Boolean) = Unit
+            }
         }
         drag = HomeDrag(
             root, home, findViewById(R.id.remove_bar),
@@ -174,6 +187,7 @@ class LauncherActivity : Activity() {
             }
         }
         root.drawerCanScrollUp = { grid.canScrollVertically(-1) }
+        root.blocked = { panels?.isOpen == true || folder.isOpen || resizeFrame != null }
         root.onDrawerStateChanged = ::onDrawerStateChanged
         findViewById<View>(R.id.open_drawer).setOnClickListener {
             root.open()
@@ -245,6 +259,7 @@ class LauncherActivity : Activity() {
         val onScreen = hasWindowFocus()
         if (onScreen && !root.isDrawerOpen && !folder.isOpen) home.pager.snapTo(0)
         folder.close(animate = onScreen)
+        if (onScreen) panels?.close() else panels?.closeNow()
         root.close(animate = onScreen)
     }
 
@@ -284,7 +299,7 @@ class LauncherActivity : Activity() {
 
     /** Back never leaves the home screen, but a preview opened from the Home tab can close. */
     private fun handleBack() {
-        if (resizeFrame != null) resizeFrame?.dismiss() else if (folder.isOpen) folder.close()
+        if (resizeFrame != null) resizeFrame?.dismiss() else if (panels?.isOpen == true) panels?.close() else if (folder.isOpen) folder.close()
         else if (root.isDrawerOpen && library?.handleBack() == true) Unit
         else if (root.isDrawerOpen) root.close() else if (!HomeSetup.isDefaultHome(this)) finish()
     }
@@ -357,6 +372,15 @@ class LauncherActivity : Activity() {
     private fun refreshIcons() {
         adapter.notifyDataSetChanged()
         home.bind()
+    }
+
+    /** Classic's pull-down: Android's own notification shade, as most launchers do it. */
+    @SuppressLint("WrongConstant")
+    private fun expandSystemShade() {
+        runCatching {
+            val bar = getSystemService("statusbar")
+            bar.javaClass.getMethod("expandNotificationsPanel").invoke(bar)
+        }
     }
 
     private fun saveHome() {
@@ -606,6 +630,7 @@ class LauncherActivity : Activity() {
             }
             home.setPadding(bars.left, bars.top, bars.right, bars.bottom)
             drawer.setPadding(bars.left, bars.top, bars.right, maxOf(bars.bottom, ime))
+            panels?.setInsets(bars.top, bars.bottom)
             insets
         }
     }

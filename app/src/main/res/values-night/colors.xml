@@ -10,4 +10,6 @@
     <color name="glass_text_muted">#FFAEB0BA</color>
     <color name="glass_scrim">#59000000</color>
     <color name="glass_danger">#E6C93A26</color>
+    <color name="glass_inverse">#FF15161A</color>
+    <color name="glass_accent">#FF0A84FF</color>
 </resources>
