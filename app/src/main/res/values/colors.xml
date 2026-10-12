@@ -29,4 +29,30 @@
     <color name="glass_danger">#E6C93A26</color>
     <color name="glass_inverse">#FFF5F5F7</color>
     <color name="glass_accent">#FF0067D9</color>
+    <!-- Glass control center: always dark glass in both modes, so these hues don't change with night mode. -->
+    <color name="cc_blue">#FF4C8DFF</color>
+    <color name="cc_blue_deep">#FF1F5FEA</color>
+    <color name="cc_indigo">#FF7B83FF</color>
+    <color name="cc_indigo_deep">#FF4B4FE0</color>
+    <color name="cc_violet">#FFA07BFF</color>
+    <color name="cc_violet_deep">#FF6D45E6</color>
+    <color name="cc_on_text">#FF8DBBFF</color>
+    <color name="cc_bubble">#26FFFFFF</color>
+    <color name="cc_bubble_edge">#40FFFFFF</color>
+    <color name="cc_track">#2EFFFFFF</color>
+    <color name="cc_handle">#66FFFFFF</color>
+    <color name="cc_glow_violet">#598B5CF6</color>
+    <color name="cc_glow_warm">#40F59E6B</color>
+    <color name="cc_glow_none">#00000000</color>
+    <color name="cc_fill_bright">#FFFFFFFF</color>
+    <color name="cc_fill_warm">#FFFFE8D6</color>
+    <color name="cc_fill_cool">#FFE9E6FF</color>
+    <color name="cc_fill_lavender">#FFC7C0FF</color>
+    <color name="cc_charge">#FF7EF0BF</color>
+    <color name="cc_charge_deep">#FF3FD69A</color>
+    <color name="cc_sun">#FFFFC53D</color>
+    <color name="cc_cloud">#FFF2F4F8</color>
+    <color name="cc_rain">#FF8DBBFF</color>
+    <color name="cc_logo_back">#FFFFFFFF</color>
+    <color name="cc_logo_front">#CC6E9CFF</color>
 </resources>

@@ -12,6 +12,8 @@ import android.content.SharedPreferences
 import android.content.res.Configuration
 import android.graphics.PixelFormat
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import android.os.PowerManager
 import android.provider.Settings
 import android.view.ContextThemeWrapper
@@ -47,6 +49,7 @@ class GlassShadeService : AccessibilityService() {
 
     override fun onServiceConnected() {
         wm = getSystemService(WindowManager::class.java)
+        running = this
         Prefs.observe(this, prefsChanged)
         registerReceiver(screen, IntentFilter().apply {
             addAction(Intent.ACTION_SCREEN_OFF)
@@ -57,6 +60,7 @@ class GlassShadeService : AccessibilityService() {
     }
 
     override fun onDestroy() {
+        if (running === this) running = null
         if (::wm.isInitialized) {
             Prefs.unobserve(this, prefsChanged)
             runCatching { unregisterReceiver(screen) }
@@ -220,8 +224,19 @@ class GlassShadeService : AccessibilityService() {
     companion object {
         private const val MIN_STRIP_DP = 24
         private const val BLUR_RADIUS_DP = 24
+        private const val SCREENSHOT_DELAY_MS = 700L
+
+        private var running: GlassShadeService? = null
 
         fun component(ctx: Context) = ComponentName(ctx, GlassShadeService::class.java)
+
+        /** Android's own screenshot, a moment later so the panel closing first is out of the shot. False when the service isn't on. */
+        fun screenshot(): Boolean {
+            val s = running ?: return false
+            if (Build.VERSION.SDK_INT < 28) return false
+            Handler(Looper.getMainLooper()).postDelayed({ s.performGlobalAction(GLOBAL_ACTION_TAKE_SCREENSHOT) }, SCREENSHOT_DELAY_MS)
+            return true
+        }
 
         /** The user has turned Decko on in Accessibility settings. */
         fun isEnabled(ctx: Context): Boolean {

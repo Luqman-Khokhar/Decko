@@ -2,6 +2,7 @@ package com.luqman.decko
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.graphics.drawable.Drawable
 import android.view.MotionEvent
 import android.view.VelocityTracker
 import android.view.View
@@ -28,6 +29,7 @@ class GlassPanels(
     private val notifications = NotificationCenter(context, ::close)
     private val controls = ControlCenter(context, ::close)
     private var current: Panel? = null
+    private val sheet = GlassDrawable(context, 0f, sheet = true)
     private val density = context.resources.displayMetrics.density
     private val spring = Spring(SPRING_STIFFNESS, SPRING_DAMPING, onUpdate = ::apply, onEnd = { if (progress <= 0f) hide() })
 
@@ -41,10 +43,13 @@ class GlassPanels(
         fun onShow()
         fun onHide()
         fun canScrollDown(): Boolean
+
+        /** Its own full-screen pane in place of the shared one, e.g. dark glass whatever the mode. */
+        val sheet: Drawable? get() = null
     }
 
     init {
-        overlay.background = GlassDrawable(context, 0f, sheet = true)
+        overlay.background = sheet
         overlay.visibility = View.GONE
         overlay.isClickable = true
         overlay.contentDescription = context.getString(R.string.close_panel)
@@ -95,6 +100,7 @@ class GlassPanels(
             current?.let { it.view.visibility = View.GONE; it.onHide() }
             current = panel
             panel.view.visibility = View.VISIBLE
+            overlay.background = panel.sheet ?: sheet
             panel.onShow()
         }
         overlay.visibility = View.VISIBLE
