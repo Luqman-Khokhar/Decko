@@ -70,10 +70,32 @@ class GlassShadeService : AccessibilityService() {
         super.onDestroy()
     }
 
-    /** Another app came forward (Home, a launch from the panel, a notification's tap): the shade gets out of the way. */
+    /**
+     * Another app came forward (Home, a launch from the panel, a notification's tap): the shade gets out of the
+     * way. The phone's own shade opening under a Glass pull is sent away instead, so only one sheet shows.
+     * Window changes are also when the default home app may have changed, so the strip is checked again.
+     */
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
-        if (event?.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED || panels == null) return
-        if (event.packageName != packageName) panels?.close()
+        if (event?.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
+        if (event.packageName == SYSTEM_UI) {
+            if (panels != null) dismissSystemShade()
+            return
+        }
+        update()
+        if (panels != null && event.packageName != packageName) panels?.close()
+    }
+
+    /** Collapses the phone's own notification shade. */
+    private fun dismissSystemShade() {
+        if (Build.VERSION.SDK_INT >= 31) {
+            performGlobalAction(GLOBAL_ACTION_DISMISS_NOTIFICATION_SHADE)
+            return
+        }
+        // Before 12 there's no global action; StatusBarManager.collapsePanels works with EXPAND_STATUS_BAR.
+        runCatching {
+            @SuppressLint("WrongConstant") val bar = getSystemService("statusbar")
+            Class.forName("android.app.StatusBarManager").getMethod("collapsePanels").invoke(bar)
+        }
     }
 
     override fun onInterrupt() = Unit
@@ -86,10 +108,14 @@ class GlassShadeService : AccessibilityService() {
         update()
     }
 
-    /** The strip is up only with Glass chosen and the phone unlocked: the shade shows notifications. */
+    /**
+     * The strip is up only while Decko is the home app with Glass chosen and the phone unlocked: the shade shows
+     * notifications. With another launcher (XOS's, say) as home, the phone's own sheets are left alone.
+     */
     private fun update() {
         val locked = getSystemService(KeyguardManager::class.java).isKeyguardLocked
-        val want = Prefs.homeStyle(this) == Prefs.STYLE_GLASS && !locked && getSystemService(PowerManager::class.java).isInteractive
+        val want = Prefs.homeStyle(this) == Prefs.STYLE_GLASS && HomeSetup.isDefaultHome(this) && !locked &&
+            getSystemService(PowerManager::class.java).isInteractive
         if (want && strip == null) addStrip() else if (!want) {
             closeNow()
             removeStrip()
@@ -204,6 +230,11 @@ class GlassShadeService : AccessibilityService() {
                     if (!pulling && dy > slop && dy > abs(ev.rawX - downX)) {
                         pulling = runCatching { openHost().begin(downX, resources.displayMetrics.widthPixels) }.getOrDefault(false)
                         downY = ev.rawY
+                        // Some phones (XOS) start their own shade from the same pull; it's sent back now and once more as it settles.
+                        if (pulling) {
+                            dismissSystemShade()
+                            postDelayed(::dismissSystemShade, SHADE_RECHECK_MS)
+                        }
                     }
                     if (pulling) panels?.drag(ev.rawY - downY)
                 }
@@ -225,6 +256,8 @@ class GlassShadeService : AccessibilityService() {
         private const val MIN_STRIP_DP = 24
         private const val BLUR_RADIUS_DP = 24
         private const val SCREENSHOT_DELAY_MS = 700L
+        private const val SHADE_RECHECK_MS = 250L
+        private const val SYSTEM_UI = "com.android.systemui"
 
         private var running: GlassShadeService? = null
 
