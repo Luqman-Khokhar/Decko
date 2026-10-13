@@ -16,6 +16,10 @@
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY" />
     <uses-permission android:name="android.permission.EXPAND_STATUS_BAR" />
+    <!-- Glass control center: brightness and auto-rotate; lists Decko under "Modify system settings". -->
+    <uses-permission android:name="android.permission.WRITE_SETTINGS" />
+    <!-- Glass control center: connection state. -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
     <!-- Decko Home lists launchable apps and checks the current home app; this grants exactly that visibility without QUERY_ALL_PACKAGES. -->
     <queries>
@@ -109,6 +113,21 @@
                 <action android:name="android.content.pm.action.CONFIRM_PIN_APPWIDGET" />
             </intent-filter>
         </activity>
+
+        <!-- Glass's notification and control centers over other apps: an overlay strip on the status bar
+             takes the pull before the system shade. Inactive unless the user turns it on in Accessibility. -->
+        <service
+            android:name=".GlassShadeService"
+            android:exported="false"
+            android:label="@string/shade_service_label"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/glass_shade_service" />
+        </service>
 
         <!-- Glass notification center. Disabled until the user turns it on, so Decko isn't listed for
              notification access (or flagged) unless they choose it. -->

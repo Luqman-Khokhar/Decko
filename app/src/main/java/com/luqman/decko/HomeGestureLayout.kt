@@ -44,6 +44,9 @@ class HomeGestureLayout @JvmOverloads constructor(
 
     var pullDown: PullDown? = null
 
+    /** Styles that show home through the drawer (blurred) handle it here and return true; otherwise home fades out. */
+    var homeUnderDrawer: (Float) -> Boolean = { false }
+
     /** True while something sits over home (an open folder or panel) that handles its own swipes. */
     var blocked: () -> Boolean = { false }
     private var pulling = false
@@ -191,11 +194,13 @@ class HomeGestureLayout @JvmOverloads constructor(
         drawer.translationY = (1 - progress) * h
         drawer.alpha = progress
         drawer.visibility = if (progress == 0f) INVISIBLE else VISIBLE
-        home.alpha = 1 - progress
-        home.scaleX = 1 - HOME_SHRINK * progress
-        home.scaleY = home.scaleX
-        home.translationY = -HOME_LIFT * h * progress
-        home.visibility = if (progress == 1f) INVISIBLE else VISIBLE
+        if (!homeUnderDrawer(progress)) {
+            home.alpha = 1 - progress
+            home.scaleX = 1 - HOME_SHRINK * progress
+            home.scaleY = home.scaleX
+            home.translationY = -HOME_LIFT * h * progress
+            home.visibility = if (progress == 1f) INVISIBLE else VISIBLE
+        }
         onProgress(progress)
         if (progress == 1f && !settledOpen) {
             settledOpen = true

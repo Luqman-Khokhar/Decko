@@ -16,8 +16,10 @@
     <color name="icon_bg">#FF23303B</color>
 
     <!-- Glass Home, light; dark values live in values-night. -->
-    <color name="glass_tint">#73FFFFFF</color>
-    <color name="glass_tint_solid">#C2F7F7F9</color>
+    <color name="glass_tint">#59FFFFFF</color>
+    <color name="glass_tint_solid">#61F2F2F5</color>
+    <!-- Text-bearing sheets: dense enough for dark text (4.5:1) even over a black wallpaper. -->
+    <color name="glass_sheet">#B8EDEDF0</color>
     <color name="glass_sheen">#59FFFFFF</color>
     <color name="glass_edge_hi">#E6FFFFFF</color>
     <color name="glass_edge_lo">#40FFFFFF</color>
@@ -27,4 +29,27 @@
     <color name="glass_danger">#E6C93A26</color>
     <color name="glass_inverse">#FFF5F5F7</color>
     <color name="glass_accent">#FF0067D9</color>
+    <!-- Glass control center: always dark glass in both modes, so these hues don't change with night mode. -->
+    <color name="cc_blue">#FF4C8DFF</color>
+    <color name="cc_blue_deep">#FF1F5FEA</color>
+    <color name="cc_violet_deep">#FF6D45E6</color>
+    <color name="cc_purple">#FFB18CFF</color>
+    <color name="cc_purple_deep">#FF7A4BEA</color>
+    <color name="cc_green">#FF5FD9A8</color>
+    <color name="cc_green_deep">#FF1E9C70</color>
+    <color name="cc_amber">#FFD9A27A</color>
+    <color name="cc_amber_deep">#FF8E5733</color>
+    <color name="cc_divider">#24FFFFFF</color>
+    <color name="cc_on_text">#FF8DBBFF</color>
+    <color name="cc_bubble">#26FFFFFF</color>
+    <color name="cc_bubble_edge">#40FFFFFF</color>
+    <color name="cc_track">#2EFFFFFF</color>
+    <color name="cc_handle">#66FFFFFF</color>
+    <color name="cc_glow_violet">#598B5CF6</color>
+    <color name="cc_glow_warm">#40F59E6B</color>
+    <color name="cc_glow_none">#00000000</color>
+    <color name="cc_fill_bright">#FFFFFFFF</color>
+    <color name="cc_fill_warm">#FFFFE8D6</color>
+    <color name="cc_fill_cool">#FFE9E6FF</color>
+    <color name="cc_fill_lavender">#FFC7C0FF</color>
 </resources>

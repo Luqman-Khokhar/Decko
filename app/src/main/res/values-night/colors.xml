@@ -1,8 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- Glass Home, dark. Only glass tokens change with night mode; Classic and the Decko app keep their look. -->
-    <color name="glass_tint">#5C16171C</color>
-    <color name="glass_tint_solid">#C71A1B20</color>
+    <color name="glass_tint">#52202126</color>
+    <color name="glass_tint_solid">#661C1D22</color>
+    <color name="glass_sheet">#8C17181C</color>
     <color name="glass_sheen">#1FFFFFFF</color>
     <color name="glass_edge_hi">#59FFFFFF</color>
     <color name="glass_edge_lo">#0FFFFFFF</color>

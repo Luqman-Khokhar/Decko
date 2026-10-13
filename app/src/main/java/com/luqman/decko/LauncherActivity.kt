@@ -20,6 +20,7 @@ import android.text.Editable
 import android.text.TextWatcher
 import android.view.View
 import android.view.WindowInsets
+import android.view.WindowInsetsController
 import android.view.accessibility.AccessibilityManager
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethodManager
@@ -147,7 +148,11 @@ class LauncherActivity : Activity() {
             )
             grid.visibility = View.GONE
             search.setOnFocusChangeListener { _, focused -> if (focused) library?.searchMode = true }
-            panels = GlassPanels(this, root).also { root.pullDown = it }
+            panels = GlassPanels(this, root, onProgress = { p ->
+                GlassStyle.blurBehind(this, p > 0f)
+                GlassStyle.homeUnder(this, HomeStyle.UNDER_PANEL, p)
+                GlassStyle.coverBars(this, p > 0.4f)
+            }).also { root.pullDown = it }
         } else {
             root.pullDown = object : HomeGestureLayout.PullDown {
                 override fun begin(x: Float, width: Int): Boolean {
@@ -174,6 +179,7 @@ class LauncherActivity : Activity() {
 
         style.dress(this, root)
         root.springs = style.springs
+        root.homeUnderDrawer = { p -> style.homeUnder(this, HomeStyle.UNDER_DRAWER, p) }
         var lastProgress = 0f
         root.onProgress = { p ->
             if (lastProgress == 0f && p > 0f) library?.reveal() ?: style.revealDrawer(grid)
@@ -186,7 +192,7 @@ class LauncherActivity : Activity() {
                 home.bind()
             }
         }
-        root.drawerCanScrollUp = { grid.canScrollVertically(-1) }
+        root.drawerCanScrollUp = { library?.canScrollUp() ?: grid.canScrollVertically(-1) }
         root.blocked = { panels?.isOpen == true || folder.isOpen || resizeFrame != null }
         root.onDrawerStateChanged = ::onDrawerStateChanged
         findViewById<View>(R.id.open_drawer).setOnClickListener {
@@ -231,7 +237,10 @@ class LauncherActivity : Activity() {
             recreate()
             return
         }
-        if (style === GlassStyle) GlassBackdrop.refresh(this)
+        if (style === GlassStyle) {
+            GlassBackdrop.refresh(this)
+            hideStatusBar()
+        }
         // Pack, clock design or overrides may have changed in the Home tab; cache keys pick that up on rebind.
         refreshIcons()
     }
@@ -612,6 +621,28 @@ class LauncherActivity : Activity() {
         }
     }
 
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus && style === GlassStyle) hideStatusBar()
+    }
+
+    /**
+     * Glass hides the status bar so a pull from the top edge only peeks the bar instead of dropping the
+     * system shade; pulls on home open Glass's own panels.
+     */
+    private fun hideStatusBar() {
+        if (Build.VERSION.SDK_INT >= 30) {
+            window.insetsController?.let {
+                it.systemBarsBehavior = WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                it.hide(WindowInsets.Type.statusBars())
+            }
+        } else {
+            @Suppress("DEPRECATION")
+            window.decorView.systemUiVisibility = window.decorView.systemUiVisibility or
+                View.SYSTEM_UI_FLAG_FULLSCREEN or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+        }
+    }
+
     /** Edge to edge: the wallpaper runs under the bars; content and the keyboard-shrunk drawer stay clear of them. */
     private fun applyInsets() {
         val home = findViewById<View>(R.id.home)
@@ -621,7 +652,8 @@ class LauncherActivity : Activity() {
             View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
         root.setOnApplyWindowInsetsListener { _, insets ->
             val (bars, ime) = if (Build.VERSION.SDK_INT >= 30) {
-                insets.getInsets(WindowInsets.Type.systemBars() or WindowInsets.Type.displayCutout()).let { Rect(it.left, it.top, it.right, it.bottom) } to
+                // Ignoring visibility keeps the layout still while Glass's hidden status bar peeks in and out.
+                insets.getInsetsIgnoringVisibility(WindowInsets.Type.systemBars() or WindowInsets.Type.displayCutout()).let { Rect(it.left, it.top, it.right, it.bottom) } to
                     insets.getInsets(WindowInsets.Type.ime()).bottom
             } else {
                 @Suppress("DEPRECATION")
