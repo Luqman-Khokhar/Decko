@@ -1,5 +1,6 @@
 package com.luqman.decko
 
+import android.content.Context
 import android.graphics.Canvas
 import android.graphics.ColorFilter
 import android.graphics.Paint
@@ -22,11 +23,11 @@ import android.widget.TextView
 
 /**
  * Top of the control center: large time and date on the left; on the right the phone's own status (signal,
- * Wi-Fi, battery, since the panel covers the status bar) above round edit and settings buttons.
+ * Wi-Fi, battery), since the panel covers the status bar.
  */
-class CcStatus(private val kit: CcKit, onEdit: () -> Unit, onSettings: () -> Unit) {
+class CcStatus(private val kit: CcKit) {
     private val ui = kit.ui
-    private val bars = BarsDrawable(kit.ink, ui.getColor(R.color.cc_track), ui.resources.displayMetrics.density)
+    private val bars = SignalBars(kit)
     private val signal = ImageView(ui).apply { setImageDrawable(bars) }
     private val wifi = kit.icon(R.drawable.ic_cc_wifi, 0, null)
     private val batteryFill = ClipDrawable(ui.getDrawable(R.drawable.ic_cc_battery_fill)!!.mutate(), Gravity.START, ClipDrawable.HORIZONTAL)
@@ -62,20 +63,11 @@ class CcStatus(private val kit: CcKit, onEdit: () -> Unit, onSettings: () -> Uni
                 setTextColor(kit.muted)
             },
         ), LinearLayout.LayoutParams(0, -2, 1f))
-        addView(LinearLayout(ui).apply {
-            orientation = LinearLayout.VERTICAL
-            gravity = Gravity.END
-            addView(icons)
-            addView(LinearLayout(ui).apply {
-                addView(button(R.drawable.ic_cc_edit, R.string.cc_edit, onEdit), LinearLayout.LayoutParams(kit.dp(46), kit.dp(46)))
-                addView(button(R.drawable.ic_cc_gear, R.string.cc_settings, onSettings), LinearLayout.LayoutParams(kit.dp(46), kit.dp(46)).apply { marginStart = kit.dp(12) })
-            }, LinearLayout.LayoutParams(-2, -2).apply { topMargin = kit.dp(14) })
-        })
+        addView(icons, LinearLayout.LayoutParams(-2, -2).apply { topMargin = kit.dp(10) })
     }
 
     fun refresh() {
-        val tm = ui.getSystemService(TelephonyManager::class.java)
-        val level = if (Build.VERSION.SDK_INT >= 28 && tm?.simState == TelephonyManager.SIM_STATE_READY) runCatching { tm.signalStrength?.level }.getOrNull() else null
+        val level = SignalBars.level(ui)
         signal.visibility = if (level == null) View.GONE else View.VISIBLE
         bars.level = level ?: 0
         val cm = ui.getSystemService(ConnectivityManager::class.java)
@@ -91,48 +83,55 @@ class CcStatus(private val kit: CcKit, onEdit: () -> Unit, onSettings: () -> Uni
     fun bindBattery(pct: Int, charging: Boolean) {
         percent.text = ui.getString(R.string.cc_battery_line, pct)
         batteryFill.level = pct * 100
-        batteryFill.setTint(if (charging) ui.getColor(R.color.cc_charge) else kit.ink)
+        batteryFill.setTint(if (charging) ui.getColor(R.color.cc_green) else kit.ink)
         batteryText = ui.getString(R.string.cc_battery_status, pct)
         refresh()
     }
+}
 
-    private fun button(icon: Int, label: Int, onClick: () -> Unit) = kit.icon(icon, 12).apply {
-        importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
-        contentDescription = ui.getString(label)
-        kit.pressable(this, borderless = true, onClick = onClick)
+/** Four rising bars, lit up to [getLevel] (0..4): mobile signal. */
+class SignalBars(kit: CcKit) : Drawable() {
+    private val on = kit.ink
+    private val off = kit.ui.getColor(R.color.cc_track)
+    private val density = kit.ui.resources.displayMetrics.density
+    private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val r = RectF()
+
+    override fun draw(canvas: Canvas) {
+        val b = bounds
+        val gap = 2 * density
+        val w = (b.width() - gap * 3) / 4
+        for (i in 0 until 4) {
+            val left = b.left + i * (w + gap)
+            r.set(left, b.bottom - b.height() * (i + 2) / 5f, left + w, b.bottom.toFloat())
+            paint.color = if (i < level) on else off
+            canvas.drawRoundRect(r, w / 3, w / 3, paint)
+        }
     }
 
-    /** Four rising bars, lit up to [getLevel] (0..4). */
-    private class BarsDrawable(private val on: Int, private val off: Int, private val density: Float) : Drawable() {
-        private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
-        private val r = RectF()
+    override fun onLevelChange(level: Int): Boolean {
+        invalidateSelf()
+        return true
+    }
 
-        override fun draw(canvas: Canvas) {
-            val b = bounds
-            val gap = 2 * density
-            val w = (b.width() - gap * 3) / 4
-            for (i in 0 until 4) {
-                val left = b.left + i * (w + gap)
-                r.set(left, b.bottom - b.height() * (i + 2) / 5f, left + w, b.bottom.toFloat())
-                paint.color = if (i < level) on else off
-                canvas.drawRoundRect(r, w / 3, w / 3, paint)
-            }
+    override fun setAlpha(alpha: Int) {
+        paint.alpha = alpha
+    }
+
+    override fun setColorFilter(colorFilter: ColorFilter?) {
+        paint.colorFilter = colorFilter
+    }
+
+    @Deprecated("Required override.")
+    override fun getOpacity() = PixelFormat.TRANSLUCENT
+
+
+    companion object {
+        /** 0..4 with a SIM ready, else null (no SIM, or Android before 9 that won't say). */
+        fun level(ctx: Context): Int? {
+            val tm = ctx.getSystemService(TelephonyManager::class.java)
+            if (Build.VERSION.SDK_INT < 28 || tm?.simState != TelephonyManager.SIM_STATE_READY) return null
+            return runCatching { tm.signalStrength?.level }.getOrNull()
         }
-
-        override fun onLevelChange(level: Int): Boolean {
-            invalidateSelf()
-            return true
-        }
-
-        override fun setAlpha(alpha: Int) {
-            paint.alpha = alpha
-        }
-
-        override fun setColorFilter(colorFilter: ColorFilter?) {
-            paint.colorFilter = colorFilter
-        }
-
-        @Deprecated("Required override.")
-        override fun getOpacity() = PixelFormat.TRANSLUCENT
     }
 }

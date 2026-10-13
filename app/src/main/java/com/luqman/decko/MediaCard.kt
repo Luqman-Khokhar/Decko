@@ -5,11 +5,16 @@ import android.content.Intent
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.media.MediaMetadata
+import android.media.MediaRouter2
 import android.media.session.MediaController
 import android.media.session.MediaSessionManager
 import android.media.session.PlaybackState
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
+import android.provider.Settings
+import android.text.format.DateUtils
 import android.text.TextUtils
 import android.view.Gravity
 import android.view.View
@@ -56,6 +61,12 @@ class MediaCard(private val context: Context, private val kit: CcKit? = null, pr
         background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(ink) }
         importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
     }
+    // Tile only; made in tile(), so declared before [view].
+    private var seek: MediaSeek? = null
+    private var elapsed: TextView? = null
+    private var total: TextView? = null
+    private var progress: View? = null
+    private val tick = Runnable { showProgress() }
     private var controller: MediaController? = null
     private val main = Handler(Looper.getMainLooper())
 
@@ -82,28 +93,77 @@ class MediaCard(private val context: Context, private val kit: CcKit? = null, pr
     private fun tile(kit: CcKit): View = LinearLayout(context).apply {
         orientation = LinearLayout.VERTICAL
         background = kit.pane(26f, R.color.cc_glow_warm)
-        setPadding(kit.dp(12), kit.dp(12), kit.dp(10), kit.dp(10))
+        setPadding(kit.dp(14), kit.dp(14), kit.dp(12), kit.dp(10))
         art.background = GradientDrawable().apply { cornerRadius = 14 * density; setColor(context.getColor(R.color.cc_bubble)) }
-        title.textSize = 15f
+        title.textSize = 16f
         artist.textSize = 13f
         addView(LinearLayout(context).apply {
-            gravity = Gravity.CENTER_VERTICAL
             addView(FrameLayout(context).apply {
                 addView(art, FrameLayout.LayoutParams(-1, -1))
                 addView(badge, FrameLayout.LayoutParams(kit.dp(18), kit.dp(18), Gravity.BOTTOM or Gravity.END).apply { setMargins(0, 0, kit.dp(4), kit.dp(4)) })
-            }, LinearLayout.LayoutParams(kit.dp(56), kit.dp(56)))
-            addView(kit.column(title, artist), LinearLayout.LayoutParams(0, -2, 1f).apply { marginStart = kit.dp(10); marginEnd = kit.dp(2) })
-            addView(kit.chevron(), LinearLayout.LayoutParams(kit.dp(18), kit.dp(18)))
+            }, LinearLayout.LayoutParams(kit.dp(64), kit.dp(64)))
+            addView(kit.column(title, artist), LinearLayout.LayoutParams(0, -2, 1f).apply { marginStart = kit.dp(12); marginEnd = kit.dp(4); topMargin = kit.dp(6) })
+            addView(kit.icon(R.drawable.ic_cc_output, 7, kit.bubble(null, square = true)).apply {
+                importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
+                contentDescription = context.getString(R.string.media_output)
+                kit.pressable(this, borderless = true, onClick = ::chooseOutput)
+            }, LinearLayout.LayoutParams(kit.dp(34), kit.dp(34)))
         })
         play.background = kit.bubble(null)
-        val s = kit.dp(44)
+        val s = kit.dp(40)
         addView(LinearLayout(context).apply {
             gravity = Gravity.CENTER
             addView(prev, LinearLayout.LayoutParams(s, s))
-            addView(play, LinearLayout.LayoutParams(kit.dp(50), kit.dp(50)).apply { marginStart = kit.dp(10); marginEnd = kit.dp(10) })
+            addView(play, LinearLayout.LayoutParams(kit.dp(54), kit.dp(54)).apply { marginStart = kit.dp(12); marginEnd = kit.dp(12) })
             addView(next, LinearLayout.LayoutParams(s, s))
-        }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = kit.dp(10) })
+        }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = kit.dp(2) })
+        val line = MediaSeek(kit).apply { onSeek = ::seekTo }
+        val start = kit.text(11f, kit.muted)
+        val end = kit.text(11f, kit.muted)
+        progress = kit.column(
+            line.also { it.layoutParams = LinearLayout.LayoutParams(-1, kit.dp(20)) },
+            LinearLayout(context).apply {
+                addView(start, LinearLayout.LayoutParams(0, -2, 1f))
+                addView(end)
+            },
+        ).also { addView(it, LinearLayout.LayoutParams(-1, -2).apply { topMargin = kit.dp(6) }) }
+        seek = line
+        elapsed = start
+        total = end
         kit.pressable(this) { open() }
+    }
+
+    /** Android 14's own output picker (speaker, headphones, cast); before that, Bluetooth settings. */
+    private fun chooseOutput() {
+        onLeave()
+        if (Build.VERSION.SDK_INT >= 34 && runCatching { MediaRouter2.getInstance(context).showSystemOutputSwitcher() }.getOrDefault(false)) return
+        runCatching { context.startActivity(Intent(Settings.ACTION_BLUETOOTH_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+    }
+
+    private fun seekTo(f: Float) {
+        val c = controller ?: return
+        val duration = c.metadata?.getLong(MediaMetadata.METADATA_KEY_DURATION) ?: return
+        c.transportControls.seekTo((f * duration).toLong())
+    }
+
+    /** Where playback is, moving on from the session's last report; ticks each second while playing. */
+    private fun showProgress() {
+        val line = seek ?: return
+        main.removeCallbacks(tick)
+        val c = controller
+        val state = c?.playbackState
+        val duration = c?.metadata?.getLong(MediaMetadata.METADATA_KEY_DURATION) ?: 0L
+        // Invisible, not gone: the tile keeps its height between tracks and streams without a length.
+        progress?.visibility = if (state != null && duration > 0) View.VISIBLE else View.INVISIBLE
+        if (state == null || duration <= 0) return
+        val playing = state.state == PlaybackState.STATE_PLAYING
+        val position = (state.position + if (playing) ((SystemClock.elapsedRealtime() - state.lastPositionUpdateTime) * state.playbackSpeed).toLong() else 0L).coerceIn(0L, duration)
+        line.isEnabled = state.actions and PlaybackState.ACTION_SEEK_TO != 0L
+        line.fraction = position / duration.toFloat()
+        elapsed?.text = DateUtils.formatElapsedTime(position / 1000)
+        total?.text = DateUtils.formatElapsedTime(duration / 1000)
+        line.contentDescription = context.getString(R.string.media_position, elapsed?.text, total?.text)
+        if (playing) main.postDelayed(tick, 1000)
     }
 
     /** The player's own screen; with nothing playing, the music app, or Android's access screen if needed. */
@@ -137,6 +197,7 @@ class MediaCard(private val context: Context, private val kit: CcKit? = null, pr
     }
 
     fun stop() {
+        main.removeCallbacks(tick)
         runCatching { context.getSystemService(MediaSessionManager::class.java).removeOnActiveSessionsChangedListener(sessionsChanged) }
         controller?.unregisterCallback(callback)
         controller = null
@@ -172,6 +233,7 @@ class MediaCard(private val context: Context, private val kit: CcKit? = null, pr
             badge.setImageDrawable(runCatching { context.packageManager.getApplicationIcon(c.packageName) }.getOrNull())
             badge.visibility = if (badge.drawable != null) View.VISIBLE else View.GONE
             setControls(true)
+            showProgress()
             view.contentDescription = context.getString(R.string.media_open) + ", " + title.text + ", " + artist.text
         } else {
             art.setImageBitmap(cover)
@@ -191,6 +253,7 @@ class MediaCard(private val context: Context, private val kit: CcKit? = null, pr
         badge.visibility = View.GONE
         play.setImageResource(R.drawable.ic_media_play)
         setControls(false)
+        showProgress()
         view.contentDescription = title.text.toString() + ", " + artist.text
     }
 

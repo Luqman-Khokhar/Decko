@@ -147,15 +147,6 @@ object Prefs {
         sp(ctx).edit().putInt("glass_mode", mode).apply()
     }
 
-    /** Control center's last weather; its own file, so saving it doesn't wake the observers of the main one. */
-    fun weather(ctx: Context): String? = weatherSp(ctx).getString("last", null)
-
-    fun setWeather(ctx: Context, json: String) {
-        weatherSp(ctx).edit().putString("last", json).apply()
-    }
-
-    private fun weatherSp(ctx: Context) = ctx.applicationContext.getSharedPreferences("weather", Context.MODE_PRIVATE)
-
     const val STYLE_CLASSIC = "classic"
     const val STYLE_GLASS = "glass"
     const val MODE_AUTO = 0

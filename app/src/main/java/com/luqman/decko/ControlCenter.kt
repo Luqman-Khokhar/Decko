@@ -12,7 +12,6 @@ import android.graphics.drawable.Drawable
 import android.graphics.drawable.GradientDrawable
 import android.hardware.camera2.CameraCharacteristics
 import android.hardware.camera2.CameraManager
-import android.hardware.display.DisplayManager
 import android.location.LocationManager
 import android.media.AudioManager
 import android.net.ConnectivityManager
@@ -25,6 +24,7 @@ import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.os.PowerManager
+import android.telephony.TelephonyManager
 import android.provider.AlarmClock
 import android.provider.MediaStore
 import android.provider.Settings
@@ -35,9 +35,9 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 
 /**
- * Right pull-down, on dark glass whatever Glass's mode: time and phone status, then Internet and Bluetooth
- * beside now playing; quick toggles with tall brightness and volume sliders; a row of connection toggles;
- * gaming and focus modes; shortcuts; weather and battery. Android lets apps switch only some of these
+ * Right pull-down, on dark glass whatever Glass's mode: time and phone status, a header with edit and
+ * settings, two columns of toggles, now playing beside brightness and volume sliders, location / hotspot /
+ * battery saver, tools, then gaming and focus modes. Android lets apps switch only some of these
  * directly; the rest open the system panel or setting for it, and the tile says which state it's in either way.
  */
 class ControlCenter(private val context: Context, private val onClose: () -> Unit) : GlassPanels.Panel {
@@ -56,10 +56,12 @@ class ControlCenter(private val context: Context, private val onClose: () -> Uni
     private var torchOn = false
     private val tiles = ArrayList<CcKit.Tile>()
     private val scroll = ScrollView(ui).apply { isVerticalScrollBarEnabled = false }
-    private val status = CcStatus(kit, onEdit = { launch(Intent(context, HomeSettingsActivity::class.java)) }, onSettings = { openPanel(Settings.ACTION_SETTINGS) })
+    private val status = CcStatus(kit)
     private val media = MediaCard(ui, kit, onLeave = onClose)
-    private val weather = WeatherCard(kit, ::launch)
-    private val device = DeviceCard(kit) { openPanel(Intent.ACTION_POWER_USAGE_SUMMARY) }
+    private val carrier = kit.text(12f)
+    private val carrierBars = SignalBars(kit)
+    private lateinit var carrierHalf: View
+    private lateinit var wifiHalf: View
     private val gamingToggle = kit.Toggle()
     private lateinit var gaming: View
     private lateinit var brightness: GlassSlider
@@ -99,31 +101,27 @@ class ControlCenter(private val context: Context, private val onClose: () -> Uni
             importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
         }
         content.addView(frame)
-        frame.addView(handle(4), LinearLayout.LayoutParams(kit.dp(36), kit.dp(4)).apply { gravity = Gravity.CENTER_HORIZONTAL; bottomMargin = kit.dp(12) })
-        frame.addView(status.view, LinearLayout.LayoutParams(-1, -2).apply { marginStart = kit.dp(8); marginEnd = kit.dp(6) })
-        frame.addView(header(), LinearLayout.LayoutParams(-1, -2).apply { topMargin = kit.dp(14); bottomMargin = kit.dp(16) })
+        frame.addView(status.view, LinearLayout.LayoutParams(-1, -2).apply { marginStart = kit.dp(10); marginEnd = kit.dp(8); topMargin = kit.dp(8) })
+        frame.addView(header(), LinearLayout.LayoutParams(-1, -2).apply { topMargin = kit.dp(14); bottomMargin = kit.dp(14) })
 
-        // Internet and Bluetooth share a card, beside now playing.
-        val internet = kit.pill(R.drawable.ic_cc_wifi, R.string.cc_internet, kit.blue, ::online, { ui.getString(if (it == true) R.string.cc_connected else R.string.cc_not_connected) }) {
+        // Two columns of toggles: Internet (with its carrier and Wi-Fi line), Airplane, Flashlight; Bluetooth, DND, Auto-rotate.
+        val internet = kit.pill(R.drawable.ic_cc_wifi, R.string.cc_internet, kit.blue, ::online, { ui.getString(if (it == true) R.string.cc_connected else R.string.cc_not_connected) }, framed = false) {
             openPanel(if (Build.VERSION.SDK_INT >= 29) Settings.Panel.ACTION_INTERNET_CONNECTIVITY else Settings.ACTION_WIFI_SETTINGS)
         }
-        val bluetooth = kit.pill(R.drawable.ic_cc_bluetooth, R.string.cc_bluetooth, kit.indigo, { Settings.Global.getInt(cr, "bluetooth_on", 0) == 1 }, kit::onOff) { openPanel(Settings.ACTION_BLUETOOTH_SETTINGS) }
         tiles += internet
-        tiles += bluetooth
-        val links = kit.column(internet.root).apply {
-            background = kit.pane(28f)
-            setPadding(kit.dp(7), kit.dp(7), kit.dp(7), kit.dp(7))
-            addView(bluetooth.root, LinearLayout.LayoutParams(-1, -2).apply { topMargin = kit.dp(7) })
-        }
-        frame.addView(row(10, links to 1.1f, media.view to 1f))
+        val left = kit.column(internetCard(internet.root))
+        fun left(t: CcKit.Tile) { tiles += t; left.addView(t.root, LinearLayout.LayoutParams(-1, -2).apply { topMargin = kit.dp(10) }) }
+        left(kit.pill(R.drawable.ic_cc_airplane, R.string.cc_airplane, kit.blue, { Settings.Global.getInt(cr, Settings.Global.AIRPLANE_MODE_ON, 0) == 1 }) { openPanel(Settings.ACTION_AIRPLANE_MODE_SETTINGS) })
+        if (torchId != null) left(kit.pill(R.drawable.ic_cc_flashlight, R.string.cc_flashlight, kit.amber, { torchOn }, onTap = ::toggleTorch))
+        // Stretched to the left column's height, its three cards sharing it evenly.
+        val right = kit.column()
+        fun right(t: CcKit.Tile) { tiles += t; right.addView(t.root, LinearLayout.LayoutParams(-1, 0, 1f).apply { if (right.childCount > 0) topMargin = kit.dp(10) }) }
+        right(kit.pill(R.drawable.ic_cc_bluetooth, R.string.cc_bluetooth, kit.purple, { Settings.Global.getInt(cr, "bluetooth_on", 0) == 1 }, end = kit.Toggle()) { openPanel(Settings.ACTION_BLUETOOTH_SETTINGS) })
+        right(kit.pill(R.drawable.ic_cc_moon, R.string.cc_dnd, kit.purple, { notifications.currentInterruptionFilter > NotificationManager.INTERRUPTION_FILTER_ALL }, onTap = ::toggleDnd))
+        right(kit.pill(R.drawable.ic_cc_rotate, R.string.cc_rotate, kit.green, { Settings.System.getInt(cr, Settings.System.ACCELEROMETER_ROTATION, 0) == 1 }, onTap = ::toggleRotate))
+        frame.addView(row(10, left to 1.2f, right to 1f))
 
-        // Quick toggles, then the sliders.
-        val quick = ArrayList<Pair<View, Float>>()
-        fun square(t: CcKit.Tile) { tiles += t; quick += t.root to 1f }
-        square(kit.square(R.drawable.ic_cc_airplane, R.string.cc_airplane, { Settings.Global.getInt(cr, Settings.Global.AIRPLANE_MODE_ON, 0) == 1 }) { openPanel(Settings.ACTION_AIRPLANE_MODE_SETTINGS) })
-        square(kit.square(R.drawable.ic_cc_moon, R.string.cc_dnd, { notifications.currentInterruptionFilter > NotificationManager.INTERRUPTION_FILTER_ALL }, ::toggleDnd))
-        if (torchId != null) square(kit.square(R.drawable.ic_cc_flashlight, R.string.cc_flashlight, { torchOn }, ::toggleTorch))
-        square(kit.square(R.drawable.ic_cc_rotate, R.string.cc_rotate, { Settings.System.getInt(cr, Settings.System.ACCELEROMETER_ROTATION, 0) == 1 }, ::toggleRotate))
+        // Now playing beside the brightness and volume sliders.
         val warm = intArrayOf(ui.getColor(R.color.cc_fill_bright), ui.getColor(R.color.cc_fill_warm))
         val cool = intArrayOf(ui.getColor(R.color.cc_fill_cool), ui.getColor(R.color.cc_fill_lavender))
         brightness = GlassSlider(ui, ui.getDrawable(R.drawable.ic_cc_sun)?.mutate(), ui.getString(R.string.cc_brightness), TRACK_INSET_DP, warm).apply {
@@ -143,41 +141,28 @@ class ControlCenter(private val context: Context, private val onClose: () -> Uni
                 runCatching { audio.setStreamVolume(AudioManager.STREAM_MUSIC, Math.round(v * max), 0) }
             }
         }
-        quick += brightness to 1.1f
-        quick += volume to 1.1f
-        frame.addView(row(6, *quick.toTypedArray()), gap())
+        frame.addView(row(10, media.view to 3.4f, brightness to 1f, volume to 1f), gap())
 
-        // Connection toggles share one wide card.
-        val connections = ArrayList<Pair<View, Float>>()
-        fun round(t: CcKit.Tile) { tiles += t; connections += t.root to 1f }
-        round(kit.round(R.drawable.ic_cc_location, R.string.cc_location, ::locationOn) { openPanel(Settings.ACTION_LOCATION_SOURCE_SETTINGS) })
-        round(kit.round(R.drawable.ic_cc_wifi, R.string.cc_hotspot, ::hotspotOn) { openPanel(ACTION_TETHER_SETTINGS) })
-        round(kit.round(R.drawable.ic_cc_leaf, R.string.cc_battery_saver, { power.isPowerSaveMode }) { openPanel(Settings.ACTION_BATTERY_SAVER_SETTINGS) })
-        round(kit.round(R.drawable.ic_cc_cast, R.string.cc_screen_cast, ::casting) { openPanel(Settings.ACTION_CAST_SETTINGS) })
-        round(kit.round(R.drawable.ic_cc_data, R.string.cc_mobile_data, ::mobileDataOn) {
-            openPanel(if (Build.VERSION.SDK_INT >= 29) Settings.Panel.ACTION_INTERNET_CONNECTIVITY else Settings.ACTION_DATA_ROAMING_SETTINGS)
-        })
-        frame.addView(row(0, *connections.toTypedArray()).apply {
+        // Location, Hotspot and Battery Saver side by side in one card.
+        val connections = LinearLayout(ui).apply {
             background = kit.pane(28f)
-            setPadding(kit.dp(2), kit.dp(14), kit.dp(2), kit.dp(12))
-        }, gap())
+            setPadding(kit.dp(6), 0, kit.dp(6), 0)
+        }
+        fun connection(t: CcKit.Tile) {
+            tiles += t
+            if (connections.childCount > 0) connections.addView(kit.divider(vertical = true))
+            connections.addView(t.root, LinearLayout.LayoutParams(0, -2, 1f))
+        }
+        connection(kit.entry(R.drawable.ic_cc_location, R.string.cc_location, kit.violet, always = true, ::locationOn) { openPanel(Settings.ACTION_LOCATION_SOURCE_SETTINGS) })
+        connection(kit.entry(R.drawable.ic_cc_wifi, R.string.cc_hotspot, kit.green, always = true, ::hotspotOn) { openPanel(ACTION_TETHER_SETTINGS) })
+        connection(kit.entry(R.drawable.ic_cc_leaf, R.string.cc_battery_saver, kit.green, always = false, { power.isPowerSaveMode }) { openPanel(Settings.ACTION_BATTERY_SAVER_SETTINGS) })
+        frame.addView(connections, gap())
+
+        frame.addView(toolsCard(), gap())
 
         gaming = modeCard(R.drawable.ic_cc_gamepad, R.string.cc_gaming, R.string.cc_gaming_sub, R.color.cc_glow_violet, gamingToggle, ::toggleGaming)
         val focus = modeCard(R.drawable.ic_cc_moon, R.string.cc_focus, R.string.cc_focus_sub, 0, kit.chevron()) { openPanel(Settings.ACTION_ZEN_MODE_PRIORITY_SETTINGS) }
         frame.addView(row(10, gaming to 1f, focus to 1f), gap())
-
-        val shortcuts = ArrayList<Pair<View, Float>>()
-        fun shortcut(icon: Int, label: Int, onTap: () -> Unit) { shortcuts += kit.shortcut(icon, label, onTap) to 1f }
-        shortcut(R.drawable.ic_cc_camera, R.string.cc_camera) { launch(Intent(MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA)) }
-        shortcut(R.drawable.ic_cc_clock, R.string.cc_alarms) { launch(Intent(AlarmClock.ACTION_SHOW_ALARMS)) }
-        if (Build.VERSION.SDK_INT >= 28) shortcut(R.drawable.ic_cc_screenshot, R.string.cc_screenshot, ::screenshot)
-        shortcut(R.drawable.ic_cc_calculator, R.string.cc_calculator) { launch(Intent.makeMainSelectorActivity(Intent.ACTION_MAIN, Intent.CATEGORY_APP_CALCULATOR)) }
-        if (nfc != null) shortcut(R.drawable.ic_cc_nfc, R.string.cc_nfc) { openPanel(Settings.ACTION_NFC_SETTINGS) }
-        // Phone cameras read QR codes in their normal photo mode; there's no system-wide scanner intent.
-        shortcut(R.drawable.ic_cc_qr, R.string.cc_qr) { launch(Intent(MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA)) }
-        frame.addView(row(6, *shortcuts.toTypedArray()), gap())
-
-        frame.addView(row(10, weather.view to 1f, device.view to 1f), gap())
         frame.addView(handle(5), LinearLayout.LayoutParams(kit.dp(120), kit.dp(5)).apply { gravity = Gravity.CENTER_HORIZONTAL; topMargin = kit.dp(16) })
     }
 
@@ -185,7 +170,6 @@ class ControlCenter(private val context: Context, private val onClose: () -> Uni
         torchId?.let { runCatching { camera.registerTorchCallback(torchCallback, main) } }
         context.registerReceiver(batteryChanged, IntentFilter(Intent.ACTION_BATTERY_CHANGED))?.let(::bindBattery)
         media.start()
-        weather.refresh()
         refresh()
     }
 
@@ -201,6 +185,7 @@ class ControlCenter(private val context: Context, private val onClose: () -> Uni
     private fun refresh() {
         tiles.forEach { it.bind() }
         status.refresh()
+        bindLinks()
         val gamingOn = notifications.currentInterruptionFilter == NotificationManager.INTERRUPTION_FILTER_ALARMS
         gamingToggle.checked = gamingOn
         gaming.contentDescription = ui.getString(R.string.cc_gaming) + ", " + kit.onOff(gamingOn)
@@ -216,22 +201,83 @@ class ControlCenter(private val context: Context, private val onClose: () -> Uni
         val pct = level * 100 / scale
         val charging = intent.getIntExtra(BatteryManager.EXTRA_STATUS, -1) == BatteryManager.BATTERY_STATUS_CHARGING
         status.bindBattery(pct, charging)
-        device.bind(pct, charging)
     }
 
-    /** Round logo beside the panel's name and what it's for. */
+    /** Square logo beside the panel's name and what it's for; edit and settings at the end. */
     private fun header() = LinearLayout(ui).apply {
         gravity = Gravity.CENTER_VERTICAL
-        val glow = intArrayOf(ui.getColor(R.color.cc_glow_violet), ui.getColor(R.color.cc_bubble))
-        addView(kit.icon(R.drawable.ic_cc_logo, 14, kit.bubble(glow)).apply { clearColorFilter() }, LinearLayout.LayoutParams(kit.dp(58), kit.dp(58)))
+        addView(kit.icon(R.drawable.ic_cc_apps, 14, kit.bubble(kit.blue, square = true)), LinearLayout.LayoutParams(kit.dp(52), kit.dp(52)))
         addView(kit.column(
-            kit.text(24f).apply {
+            kit.text(23f).apply {
                 setText(R.string.control_center)
                 importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
                 if (Build.VERSION.SDK_INT >= 28) isAccessibilityHeading = true
             },
-            kit.text(14f, kit.muted).apply { setText(R.string.cc_subtitle) },
-        ), LinearLayout.LayoutParams(0, -2, 1f).apply { marginStart = kit.dp(14) })
+            kit.text(13f, kit.muted, lines = 2).apply { setText(R.string.cc_subtitle) },
+        ), LinearLayout.LayoutParams(0, -2, 1f).apply { marginStart = kit.dp(12); marginEnd = kit.dp(8) })
+        addView(kit.roundButton(R.drawable.ic_cc_edit, R.string.cc_edit) { launch(Intent(context, HomeSettingsActivity::class.java)) }, LinearLayout.LayoutParams(kit.dp(44), kit.dp(44)))
+        addView(kit.roundButton(R.drawable.ic_cc_gear, R.string.cc_settings) { openPanel(Settings.ACTION_SETTINGS) }, LinearLayout.LayoutParams(kit.dp(44), kit.dp(44)).apply { marginStart = kit.dp(10) })
+    }
+
+    /** The Internet row over a hairline and a line naming the mobile network (with its bars) and Wi-Fi. */
+    private fun internetCard(row: View) = kit.column(row).apply {
+        background = kit.pane(24f)
+        setPadding(kit.dp(12), kit.dp(12), kit.dp(12), kit.dp(10))
+        addView(kit.divider(vertical = false), LinearLayout.LayoutParams(-1, 1.coerceAtLeast(kit.dp(1))).apply { topMargin = kit.dp(10); bottomMargin = kit.dp(8) })
+        carrierHalf = LinearLayout(ui).apply {
+            gravity = Gravity.CENTER_VERTICAL
+            addView(android.widget.ImageView(ui).apply { setImageDrawable(carrierBars) }, LinearLayout.LayoutParams(kit.dp(16), kit.dp(13)))
+            addView(carrier, LinearLayout.LayoutParams(0, -2, 1f).apply { marginStart = kit.dp(8) })
+        }
+        wifiHalf = LinearLayout(ui).apply {
+            gravity = Gravity.CENTER_VERTICAL
+            addView(kit.icon(R.drawable.ic_cc_wifi, 0, null), LinearLayout.LayoutParams(kit.dp(16), kit.dp(16)))
+            addView(kit.text(12f).apply { setText(R.string.cc_wifi) }, LinearLayout.LayoutParams(-2, -2).apply { marginStart = kit.dp(8) })
+        }
+        addView(LinearLayout(ui).apply {
+            gravity = Gravity.CENTER_VERTICAL
+            addView(carrierHalf, LinearLayout.LayoutParams(0, -2, 1f))
+            addView(kit.divider(vertical = true), LinearLayout.LayoutParams(1.coerceAtLeast(kit.dp(1)), kit.dp(18)).apply { marginStart = kit.dp(6); marginEnd = kit.dp(12) })
+            addView(wifiHalf, LinearLayout.LayoutParams(0, -2, 1f))
+        })
+    }
+
+    /** Mobile network name and bars (hidden without a SIM); Wi-Fi bright while it carries the connection. */
+    private fun bindLinks() {
+        val level = SignalBars.level(context)
+        val name = runCatching { context.getSystemService(TelephonyManager::class.java).networkOperatorName }.getOrNull()
+        carrierHalf.visibility = if (level == null || name.isNullOrBlank()) View.INVISIBLE else View.VISIBLE
+        carrierBars.level = level ?: 0
+        carrier.text = name
+        val cm = context.getSystemService(ConnectivityManager::class.java)
+        val onWifi = runCatching { cm.getNetworkCapabilities(cm.activeNetwork)?.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) == true }.getOrDefault(false)
+        wifiHalf.alpha = if (onWifi) 1f else DIM_ALPHA
+    }
+
+    /** "Tools & Utilities": a heading over launch buttons split by hairlines. */
+    private fun toolsCard() = kit.column().apply {
+        background = kit.pane(28f)
+        setPadding(kit.dp(12), kit.dp(12), kit.dp(12), kit.dp(12))
+        addView(LinearLayout(ui).apply {
+            gravity = Gravity.CENTER_VERTICAL
+            addView(kit.icon(R.drawable.ic_cc_tools, 7, kit.bubble(null, square = true)), LinearLayout.LayoutParams(kit.dp(32), kit.dp(32)))
+            addView(kit.text(15f).apply { setText(R.string.cc_tools) }, LinearLayout.LayoutParams(0, -2, 1f).apply { marginStart = kit.dp(10) })
+            addView(kit.chevron(), LinearLayout.LayoutParams(kit.dp(18), kit.dp(18)))
+            contentDescription = ui.getString(R.string.cc_tools)
+            kit.pressable(this) { openPanel(Settings.ACTION_SETTINGS) }
+        })
+        val tools = LinearLayout(ui)
+        fun tool(icon: Int, label: Int, onTap: () -> Unit) {
+            if (tools.childCount > 0) tools.addView(kit.divider(vertical = true))
+            tools.addView(kit.tool(icon, label, onTap), LinearLayout.LayoutParams(0, -2, 1f))
+        }
+        if (Build.VERSION.SDK_INT >= 28) tool(R.drawable.ic_cc_screenshot, R.string.cc_screenshot, ::screenshot)
+        tool(R.drawable.ic_cc_clock, R.string.cc_alarms) { launch(Intent(AlarmClock.ACTION_SHOW_ALARMS)) }
+        tool(R.drawable.ic_cc_calculator, R.string.cc_calculator) { launch(Intent.makeMainSelectorActivity(Intent.ACTION_MAIN, Intent.CATEGORY_APP_CALCULATOR)) }
+        if (nfc != null) tool(R.drawable.ic_cc_nfc, R.string.cc_nfc) { openPanel(Settings.ACTION_NFC_SETTINGS) }
+        // Phone cameras read QR codes in their normal photo mode; there's no system-wide scanner intent.
+        tool(R.drawable.ic_cc_qr, R.string.cc_qr) { launch(Intent(MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA)) }
+        addView(tools, LinearLayout.LayoutParams(-1, -2).apply { topMargin = kit.dp(12) })
     }
 
     /** Gaming and Focus: hue bubble, name over what it does, and a switch or chevron at the end. */
@@ -278,11 +324,6 @@ class ControlCenter(private val context: Context, private val onClose: () -> Uni
         val wifi = context.applicationContext.getSystemService(WifiManager::class.java)
         WifiManager::class.java.getMethod("isWifiApEnabled").invoke(wifi) as Boolean
     }.getOrNull()
-
-    /** Casting shows up as a presentation display while it's on. */
-    private fun casting(): Boolean = context.getSystemService(DisplayManager::class.java).getDisplays(DisplayManager.DISPLAY_CATEGORY_PRESENTATION).isNotEmpty()
-
-    private fun mobileDataOn(): Boolean? = runCatching { Settings.Global.getInt(cr, "mobile_data") == 1 }.getOrNull()
 
     private fun toggleTorch() {
         val id = torchId ?: return
@@ -350,6 +391,7 @@ class ControlCenter(private val context: Context, private val onClose: () -> Uni
 
     private companion object {
         const val SLIDER_DP = 128
+        const val DIM_ALPHA = 0.45f
         const val TRACK_INSET_DP = 14f
         const val MIN_BRIGHTNESS = 1
         const val MAX_BRIGHTNESS = 255

@@ -37,8 +37,10 @@ class CcKit(base: Context) {
     val muted = ui.getColor(R.color.glass_text_muted)
     val onText = ui.getColor(R.color.cc_on_text)
     val blue = intArrayOf(ui.getColor(R.color.cc_blue), ui.getColor(R.color.cc_blue_deep))
-    val indigo = intArrayOf(ui.getColor(R.color.cc_indigo), ui.getColor(R.color.cc_indigo_deep))
     val violet = intArrayOf(ui.getColor(R.color.cc_blue), ui.getColor(R.color.cc_violet_deep))
+    val purple = intArrayOf(ui.getColor(R.color.cc_purple), ui.getColor(R.color.cc_purple_deep))
+    val green = intArrayOf(ui.getColor(R.color.cc_green), ui.getColor(R.color.cc_green_deep))
+    val amber = intArrayOf(ui.getColor(R.color.cc_amber), ui.getColor(R.color.cc_amber_deep))
 
     fun dp(v: Int) = (v * density).toInt()
 
@@ -109,7 +111,7 @@ class CcKit(base: Context) {
     /**
      * A switch-like control: its state is read fresh on every [bind]. [onColors] fills the bubble while on
      * ([always] keeps it filled, for tiles whose hue is their identity); the state is spelled out too, so
-     * color is never the only signal.
+     * color is never the only signal. A [toggle] at the end follows the state.
      */
     inner class Tile(
         val root: View,
@@ -118,83 +120,88 @@ class CcKit(base: Context) {
         private val label: String,
         private val onColors: IntArray,
         private val always: Boolean,
-        private val highlightOn: Boolean,
         private val isOn: () -> Boolean?,
         private val stateText: (Boolean?) -> String,
+        private val toggle: Toggle? = null,
     ) {
         fun bind() {
             val on = isOn()
             bubbleView.background = bubble(if (on == true || always) onColors else null)
             state.text = stateText(on)
-            state.setTextColor(if (on == true && highlightOn) onText else muted)
+            state.setTextColor(if (on == true) onText else muted)
+            toggle?.checked = on == true
             root.contentDescription = "$label, ${state.text}"
         }
     }
 
     fun onOff(on: Boolean?) = ui.getString(when (on) { true -> R.string.state_on; false -> R.string.state_off; null -> R.string.state_open })
 
-    /** Wide row: hue bubble, name over state, chevron. Internet and Bluetooth. */
-    fun pill(iconRes: Int, label: Int, colors: IntArray, isOn: () -> Boolean?, stateText: (Boolean?) -> String, onTap: () -> Unit): Tile {
+    /**
+     * Hue bubble, name over state, and [end] (a chevron, or a [Toggle]). On its own glass card unless
+     * [framed] is false, for a row inside a bigger card.
+     */
+    fun pill(
+        iconRes: Int, label: Int, colors: IntArray, isOn: () -> Boolean?, stateText: (Boolean?) -> String = ::onOff,
+        end: View = chevron(), framed: Boolean = true, onTap: () -> Unit,
+    ): Tile {
+        val bubble = icon(iconRes, 11)
+        val state = text(13f, muted)
+        val root = LinearLayout(ui).apply {
+            gravity = Gravity.CENTER_VERTICAL
+            if (framed) {
+                background = pane(24f)
+                setPadding(dp(12), dp(12), dp(12), dp(12))
+            }
+            addView(bubble, LinearLayout.LayoutParams(dp(46), dp(46)))
+            addView(column(fitText(15, 11, medium = true).apply { gravity = Gravity.START; setText(label) }, state), LinearLayout.LayoutParams(0, -2, 1f).apply { marginStart = dp(12); marginEnd = dp(6) })
+            addView(end, if (end is Toggle) LinearLayout.LayoutParams(dp(38), dp(22)) else LinearLayout.LayoutParams(dp(18), dp(18)))
+        }
+        pressable(root, onClick = onTap)
+        return Tile(root, bubble, state, ui.getString(label), colors, always = true, isOn, stateText, end as? Toggle)
+    }
+
+    /** Bubble, name over state, chevron, compact: one of several side by side in a shared card. Location and the like. */
+    fun entry(iconRes: Int, label: Int, colors: IntArray, always: Boolean, isOn: () -> Boolean?, onTap: () -> Unit): Tile {
         val bubble = icon(iconRes, 10)
         val state = text(12f, muted)
         val root = LinearLayout(ui).apply {
             gravity = Gravity.CENTER_VERTICAL
-            background = pane(22f)
-            setPadding(dp(10), dp(10), dp(12), dp(10))
+            setPadding(dp(6), dp(12), dp(4), dp(12))
             addView(bubble, LinearLayout.LayoutParams(dp(42), dp(42)))
-            addView(column(text(15f, medium = true).apply { setText(label) }, state), LinearLayout.LayoutParams(0, -2, 1f).apply { marginStart = dp(12); marginEnd = dp(4) })
-            addView(chevron(), LinearLayout.LayoutParams(dp(18), dp(18)))
+            addView(column(fitText(14, 10).apply { gravity = Gravity.START; setText(label) }, state), LinearLayout.LayoutParams(0, -2, 1f).apply { marginStart = dp(8) })
+            addView(chevron(), LinearLayout.LayoutParams(dp(14), dp(14)))
         }
         pressable(root, onClick = onTap)
-        return Tile(root, bubble, state, ui.getString(label), colors, always = true, highlightOn = false, isOn, stateText)
+        return Tile(root, bubble, state, ui.getString(label), colors, always, isOn, ::onOff)
     }
 
-    /** Small card: bubble over a two-line name and its state. Airplane mode, Do Not Disturb and the like. */
-    fun square(iconRes: Int, label: Int, isOn: () -> Boolean?, onTap: () -> Unit): Tile {
-        val bubble = icon(iconRes, 10)
-        val state = text(10f, muted).apply { gravity = Gravity.CENTER_HORIZONTAL }
-        val root = LinearLayout(ui).apply {
-            orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER
-            background = pane(22f)
-            setPadding(dp(4), dp(12), dp(4), dp(10))
-            addView(bubble, LinearLayout.LayoutParams(dp(42), dp(42)))
-            addView(fitText(12, 9, medium = true).apply { setText(label) }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(8) })
-            addView(state, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(2) })
-        }
-        pressable(root, onClick = onTap)
-        return Tile(root, bubble, state, ui.getString(label), blue, always = false, highlightOn = true, isOn, ::onOff)
-    }
-
-    /** Column inside a shared card: larger bubble, name, state. Location, Hotspot and the like. */
-    fun round(iconRes: Int, label: Int, isOn: () -> Boolean?, onTap: () -> Unit): Tile {
-        val bubble = icon(iconRes, 13)
-        val state = text(11f, muted).apply { gravity = Gravity.CENTER_HORIZONTAL }
-        val root = LinearLayout(ui).apply {
-            orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER_HORIZONTAL
-            setPadding(0, dp(4), 0, dp(4))
-            addView(bubble, LinearLayout.LayoutParams(dp(50), dp(50)))
-            addView(fitText(13, 9).apply { maxLines = 1 }.apply { setText(label) }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(8) })
-            addView(state, LinearLayout.LayoutParams(-1, -2))
-        }
-        pressable(root, borderless = true, onClick = onTap)
-        return Tile(root, bubble, state, ui.getString(label), violet, always = false, highlightOn = true, isOn, ::onOff)
-    }
-
-    /** Card with a rounded-square icon over its name: launches something. */
-    fun shortcut(iconRes: Int, label: Int, onTap: () -> Unit): View = LinearLayout(ui).apply {
+    /** Rounded-square glass button over its name: launches something. */
+    fun tool(iconRes: Int, label: Int, onTap: () -> Unit): View = LinearLayout(ui).apply {
         orientation = LinearLayout.VERTICAL
         gravity = Gravity.CENTER_HORIZONTAL
-        background = pane(20f)
-        setPadding(dp(2), dp(10), dp(2), dp(10))
-        addView(icon(iconRes, 9, bubble(null, square = true)), LinearLayout.LayoutParams(dp(40), dp(40)))
-        addView(fitText(11, 8).apply { maxLines = 1 }.apply { setText(label) }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(8) })
+        setPadding(dp(2), dp(4), dp(2), dp(4))
+        addView(icon(iconRes, 13, pane(16f)), LinearLayout.LayoutParams(dp(52), dp(50)))
+        addView(fitText(12, 8).apply { maxLines = 1 }.apply { setText(label) }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(8) })
         contentDescription = ui.getString(label)
-        pressable(this, onClick = onTap)
+        pressable(this, borderless = true, onClick = onTap)
     }
 
-    /** The pill switch on the gaming card: a hue track when on, a white knob sliding across. Shows state only; the card takes the tap. */
+    /** Hairline between entries in a shared card; [vertical] stands between side-by-side ones. */
+    fun divider(vertical: Boolean) = View(ui).apply {
+        setBackgroundColor(ui.getColor(R.color.cc_divider))
+        importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+        layoutParams = if (vertical) LinearLayout.LayoutParams(dp(1).coerceAtLeast(1), -1).apply { setMargins(0, dp(14), 0, dp(14)) }
+        else LinearLayout.LayoutParams(-1, dp(1).coerceAtLeast(1))
+    }
+
+    /** Round glass button for the header (edit, settings). */
+    fun roundButton(iconRes: Int, label: Int, onClick: () -> Unit) = icon(iconRes, 12).apply {
+        importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
+        contentDescription = ui.getString(label)
+        pressable(this, borderless = true, onClick = onClick)
+    }
+
+    /** Pill switch (Bluetooth, gaming): a hue track when on, a white knob sliding across. Shows state only; its card takes the tap. */
     @SuppressLint("ViewConstructor")
     inner class Toggle : View(ui) {
         private val track = Paint(Paint.ANTI_ALIAS_FLAG)
